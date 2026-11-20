@@ -1,0 +1,26 @@
+cellhippo: HIPPO phenotype discovery for annotated cell tables
+
+Ports HIPPO's chain (64 fine clusters -> inter-cluster Pearson -> BIC-selected
+GMM -> phenotypes) onto per-cell tables that already carry an annotation, and
+adds the test the original cannot run: does a discovered phenotype split an
+annotated cell type, or restate it.
+
+Data: the GHIST_input label tables carry no expression, so the matching 10x
+Xenium matrices were located from the dataset URLs in the source notes and the
+mapping verified by barcode overlap (99.66-99.93%), not assumed.
+
+Results on four runs:
+  5k     278,146 cells -> 10 phenotypes  ARI 0.572  13/17 annotations split
+  lc     160,448 cells ->  6 phenotypes  ARI 0.555   9/14
+  luad   161,894 cells ->  5 phenotypes  ARI 0.488   7/10
+  pooled 600,488 cells ->  9 phenotypes  ARI 0.761   4/23  (label-only control)
+
+The label-only control is the finding: it reaches ARI 0.761 with 19/23
+annotations intact at 100%, i.e. it can only echo its inputs. Adding expression
+lowers agreement and raises splits, which is what a pipeline that finds
+structure the annotation does not name should look like.
+
+The slide-level consensus step refuses to run on 3 slides rather than faking a
+result, and no survival endpoint is claimed - these datasets ship no follow-up.
+
+Co-authored-by: CommandCodeBot <noreply@commandcode.ai>
