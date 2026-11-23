@@ -56,6 +56,22 @@ to rotate, scroll to zoom, step through phenotypes, and a cross-section toggle
 that hides everything below `z = 0` — the cells that remain are the ones the knife
 actually cut.
 
+### Volume render
+
+Free spheres and metaballs were tried first, in Blender, and both capped out at
+3–5/10 — the expected ceiling for a surface mesh, which cannot produce internal
+scattering or depth falloff. `tools/volume_render_cells.py` is a front-to-back
+emission-absorption ray march instead: per-sample opacity, gradient shading,
+filmic shoulder. Pixel statistics for both slides: `mean 24–32, max 207–224,
+corner [0,0,0], lit 26–29%`.
+
+It is **not** at the level of a figure rendered from a real 3D microscopy stack,
+and the limitation is the data. This model is ~20 uniform spheres whose positions
+were inferred from a single section, so the only structure available is the sphere
+and the core drawn inside it. Cells sit ~12 µm apart at this density, so a field
+wide enough to hold forty of them is ~85 µm across while `z` spans only ±6 µm — a
+wafer, not a block.
+
 ## Install
 
 ```bash
@@ -142,6 +158,8 @@ tools/train_cnn.py            contrastive CNN on tiles
 tools/cluster_tiles.py        HIPPO eq. 1-3 on the fused block, with ablations
 tools/make_figures.py         gallery / spatial / heatmap panels
 tools/build_3d.py             2D -> 3D cell inference (sectioning relation)
+tools/volume_render_cells.py  emission-absorption volume render of that model
+tools/blender_scene.py        Blender scene for the surface-based attempt
 tools/viewer3d.py             the interactive canvas viewer for the page
 tools/build_page.py           generate docs/index.html
 docs/index.html               the walkthrough
