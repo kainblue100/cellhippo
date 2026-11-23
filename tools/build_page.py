@@ -5,6 +5,10 @@ cannot drift from what was computed.
 """
 import json
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import viewer3d
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -18,6 +22,11 @@ ab_e = json.load(open(os.path.join(DOCS, "ab_expr.json")))
 m5 = json.load(open(os.path.join(DOCS, "5k_tiles_meta.json")))
 ml = json.load(open(os.path.join(DOCS, "lc_tiles_meta.json")))
 reg = json.load(open(os.path.join(DOCS, "registration_final.json")))
+M3D = {}
+for t in ("5k", "lc"):
+    p = os.path.join(DOCS, f"model3d_{t}.json")
+    if os.path.exists(p):
+        M3D[t] = json.load(open(p))
 
 PAL = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3"]
 RUNS = [("fused", "image + expression + annotation", fused),
@@ -116,6 +125,7 @@ def html():
  a {{ color:var(--accent) }}
  .hi {{ background:#fff3cd; padding:1px 4px; border-radius:3px }}
  footer {{ color:var(--muted); font-size:13px; padding:44px 24px 60px; text-align:center }}
+{viewer3d.head_css()}
 </style></head><body>
 <header><div class="wrap">
  <div class="tag">methods note</div>
@@ -276,7 +286,50 @@ improving as components are added, since 64 points in 64 dimensions can always b
 fitted better by more Gaussians — an early run picked 30 "phenotypes" for 2,086
 tiles, which is curve fitting rather than structure.</p>
 
-<h2>6. What this does not show</h2>
+<h2>6. The learned patterns as a 3D model</h2>
+<p>A 2D section is a slice through a three-dimensional tissue, and the slice still
+carries information about the third axis. Sectioning a sphere of radius <span
+class="mono">R</span> at distance <span class="mono">z</span> from its centre
+leaves a disc of radius <span class="mono">a = sqrt(R² − z²)</span> — so the
+apparent area is not the cell's size, it is the size of the cut.
+<a href="https://doi.org/10.1002/advs.202518706">CellSqueeze3D</a> (Kong &amp; Lu,
+<em>Adv Sci</em> 2026) turns that relation into an inverse problem and solves it
+under biomechanical constraints. This section does the same on our fields, and
+renders the answer the way <a href="https://arxiv.org/abs/2101.11600">Alon
+et&nbsp;al.</a> do — as explicit spheres carrying position, radius and the learned
+phenotype, rather than a voxel grid, so the pattern is visible in the model.</p>
+
+<div class="callout">
+<strong>What is inferred, and what breaks the degeneracy.</strong> One number per
+cell (its 2D area) cannot determine two unknowns (<span class="mono">R</span> and
+<span class="mono">z</span>) on its own. What makes it solvable is that
+<em>cells of one phenotype share a true radius</em>: a cell with a small apparent
+area is then read as a cell cut away from its equator, not as a small cell. The
+sign of <span class="mono">z</span> is free, and is chosen to reduce overlap.
+Nothing here measures <span class="mono">z</span>; it is the least-assumption
+arrangement consistent with the 2D observation.
+</div>
+
+<p>Two honest limits came out of this, and both are in the numbers below rather
+than in a footnote. First, the group radius is capped by what the observed density
+can physically accommodate — <span class="mono">N</span> spheres of radius
+<span class="mono">R</span> in area <span class="mono">A</span> and slab
+<span class="mono">2t</span> cannot exceed a packing fraction of about 0.6, and
+without the cap the solver is asked for something geometrically impossible.
+Second, at these densities the 3D adjustment cannot clear every conflict: tissue
+is packed near the jamming limit, so a sphere model leaves residual overlap. The
+figure reported is the fraction of 2D conflicts that moving cells in
+<span class="mono">z</span> actually resolves.</p>
+
+{M3D.get('5k') and viewer3d.section('5k', M3D['5k']) or ''}
+{M3D.get('lc') and viewer3d.section('lc', M3D['lc']) or ''}
+
+<p class="note">Drag to rotate, scroll to zoom, or step through the phenotypes one
+at a time. The cross-section toggle hides everything below
+<span class="mono">z = 0</span>, which is the slice the pathologist actually looked
+at — the cells that remain are the ones the knife cut through.</p>
+
+<h2>7. What this does not show</h2>
 <div class="callout warn">
 <ul style="margin:0;padding-left:20px">
 <li><strong>Two slides.</strong> 2,086 tiles from 5k and lc. HIPPO used 227,000
@@ -296,7 +349,7 @@ differences the clustering is supposed to see.</li>
 </ul>
 </div>
 
-<h2>7. Reproducing</h2>
+<h2>8. Reproducing</h2>
 <pre>python tools/fetch_10x_all.py            # matrices + coordinates + H&amp;E
 python tools/register_final.py          # rotation, scale, translation
 python tools/extract_tiles.py --tag 5k  # HIPPO-style tiling + three modalities
@@ -304,15 +357,20 @@ python tools/extract_tiles.py --tag lc
 python tools/train_cnn.py --tiles work/5k_tiles.npz work/lc_tiles.npz \\
     --epochs 80 --clusters 64 --out work/cnn_tiles.npz
 python tools/cluster_tiles.py --tags 5k lc --img --expr --ann --name fused
-python tools/make_figures.py --name fused --tags 5k lc</pre>
+python tools/make_figures.py --name fused --tags 5k lc
+python tools/build_3d.py --tag 5k --block 1 --slab-um 6   # 2D -> 3D</pre>
 
 <footer>
  cellhippo — an independent reimplementation of the HIPPO chain for annotated cell
  tables with an image modality. Not affiliated with the HIPPO authors; the method
- and the imaging conventions are theirs (see HIPOS and GHIST+), the annotation
- dimension and the registration are this port's problem.
+ and the imaging conventions are theirs (see HIPOS and GHIST+). The 3D inference
+ follows CellSqueeze3D's sectioning relation and Alon et al.'s primitive-based
+ rendering.
 </footer>
-</div></body></html>
+</div>
+<script>{viewer3d.VIEW_JS % {"pal": json.dumps(viewer3d.PAL)}}</script>
+{viewer3d.init_script([t for t in ("5k", "lc") if t in M3D])}
+</body></html>
 """
 
 
