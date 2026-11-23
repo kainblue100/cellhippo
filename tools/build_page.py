@@ -5,10 +5,6 @@ cannot drift from what was computed.
 """
 import json
 import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import viewer3d
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -22,11 +18,6 @@ ab_e = json.load(open(os.path.join(DOCS, "ab_expr.json")))
 m5 = json.load(open(os.path.join(DOCS, "5k_tiles_meta.json")))
 ml = json.load(open(os.path.join(DOCS, "lc_tiles_meta.json")))
 reg = json.load(open(os.path.join(DOCS, "registration_final.json")))
-M3D = {}
-for t in ("5k", "lc"):
-    p = os.path.join(DOCS, f"model3d_{t}.json")
-    if os.path.exists(p):
-        M3D[t] = json.load(open(p))
 
 TRAJ = {}
 _p = os.path.join(DOCS, "trajectory.json")
@@ -143,7 +134,6 @@ def html():
  a {{ color:var(--accent) }}
  .hi {{ background:#fff3cd; padding:1px 4px; border-radius:3px }}
  footer {{ color:var(--muted); font-size:13px; padding:44px 24px 60px; text-align:center }}
-{viewer3d.head_css()}
 </style></head><body>
 <header><div class="wrap">
  <div class="tag">methods note</div>
@@ -304,47 +294,14 @@ fitted better by more Gaussians 鈥?an early run picked 30 "phenotypes" for 2,08
 tiles, which is curve fitting rather than structure.</p>
 
 <h2>6. The learned patterns as a 3D model</h2>
-<p>A 2D section is a slice through a three-dimensional tissue, and the slice still
-carries information about the third axis. Sectioning a sphere of radius <span
-class="mono">R</span> at distance <span class="mono">z</span> from its centre
-leaves a disc of radius <span class="mono">a = sqrt(R虏 鈭?z虏)</span> 鈥?so the
-apparent area is not the cell's size, it is the size of the cut.
-<a href="https://doi.org/10.1002/advs.202518706">CellSqueeze3D</a> (Kong &amp; Lu,
-<em>Adv Sci</em> 2026) turns that relation into an inverse problem and solves it
-under biomechanical constraints. This section does the same on our fields, and
-renders the answer the way <a href="https://arxiv.org/abs/2101.11600">Alon
-et&nbsp;al.</a> do 鈥?as explicit spheres carrying position, radius and the learned
-phenotype, rather than a voxel grid, so the pattern is visible in the model.</p>
-
-<div class="callout">
-<strong>What is inferred, and what breaks the degeneracy.</strong> One number per
-cell (its 2D area) cannot determine two unknowns (<span class="mono">R</span> and
-<span class="mono">z</span>) on its own. What makes it solvable is that
-<em>cells of one phenotype share a true radius</em>: a cell with a small apparent
-area is then read as a cell cut away from its equator, not as a small cell. The
-sign of <span class="mono">z</span> is free, and is chosen to reduce overlap.
-Nothing here measures <span class="mono">z</span>; it is the least-assumption
-arrangement consistent with the 2D observation.
-</div>
-
-<p>Two honest limits came out of this, and both are in the numbers below rather
-than in a footnote. First, the group radius is capped by what the observed density
-can physically accommodate 鈥?<span class="mono">N</span> spheres of radius
-<span class="mono">R</span> in area <span class="mono">A</span> and slab
-<span class="mono">2t</span> cannot exceed a packing fraction of about 0.6, and
-without the cap the solver is asked for something geometrically impossible.
-Second, at these densities the 3D adjustment cannot clear every conflict: tissue
-is packed near the jamming limit, so a sphere model leaves residual overlap. The
-figure reported is the fraction of 2D conflicts that moving cells in
-<span class="mono">z</span> actually resolves.</p>
-
-{M3D.get('5k') and viewer3d.section('5k', M3D['5k']) or ''}
-{M3D.get('lc') and viewer3d.section('lc', M3D['lc']) or ''}
-
-<p class="note">Drag to rotate, scroll to zoom, or step through the phenotypes one
-at a time. The cross-section toggle hides everything below
-<span class="mono">z = 0</span>, which is the slice the pathologist actually looked
-at 鈥?the cells that remain are the ones the knife cut through.</p>
+<p>Each pattern is shown as a block of cells: the tissue its windows came from,
+with every cell drawn as a membrane, a cytoplasm and a nucleus. Two published
+pieces supply the construction — <a
+href="https://doi.org/10.1002/advs.202518706">CellSqueeze3D</a> (Kong &amp; Lu,
+<em>Adv Sci</em> 2026) for the physical constraints on where a cell centre can sit
+inside a section, and <a href="https://arxiv.org/abs/2101.11600">Alon et
+al.</a> for building the result as explicit primitives rather than a voxel volume,
+so the phenotype stays legible inside the model.</p>
 
 <h3>Volume render</h3>
 <p>The Blender route was abandoned too early the first time. The mistake was the
@@ -601,8 +558,6 @@ python tools/build_3d.py --tag 5k --block 1 --slab-um 6   # 2D -> 3D</pre>
  rendering.
 </footer>
 </div>
-<script>{viewer3d.VIEW_JS % {"pal": json.dumps(viewer3d.PAL)}}</script>
-{viewer3d.init_script([t for t in ("5k", "lc") if t in M3D])}
 </body></html>
 """
 
