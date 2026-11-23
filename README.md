@@ -26,6 +26,35 @@ figures, ablations.
 | 5 | fuse image ⊕ expression PCs ⊕ annotation fractions, z-scored per block | GHIST+ input contract |
 | 6 | k-means (k=64) → Pearson between centroids → diagonal GMM with G by BIC | HIPPO eq. 1–3 |
 | 7 | representative-tile gallery, spatial unit map, composition heatmaps | HIPPO Figs 2C, 3A, 5B |
+| 8 | 3D model: infer each cell's z from the sectioning relation, render as spheres coloured by phenotype | CellSqueeze3D; Alon et al. |
+
+## The 3D model
+
+A 2D section still carries the third axis. Sectioning a sphere of radius `R` at
+distance `z` from its centre leaves a disc of radius `a = sqrt(R² − z²)`, so the
+apparent area is the size of the cut, not the size of the cell —
+[CellSqueeze3D](https://doi.org/10.1002/advs.202518706) (Kong & Lu, *Adv Sci*
+2026) turns that into an inverse problem. The result is rendered the way
+[Alon et al.](https://arxiv.org/abs/2101.11600) build theirs: explicit spheres
+carrying position, radius and the learned phenotype, not a voxel grid.
+
+One number per cell cannot determine both `R` and `z`. What breaks the degeneracy
+is that **cells of one phenotype share a true radius**, so a small apparent area
+reads as a cut away from the equator rather than a small cell. The sign of `z` is
+free and is chosen to reduce overlap.
+
+Two limits are reported rather than hidden:
+
+- the group radius is capped by the packing the density can hold — `N` spheres of
+  radius `R` in area `A` and slab `2t` cannot exceed a packing fraction near 0.6
+- at tissue density the 3D adjustment cannot clear every conflict. It resolves
+  31% of the 2D conflicts on 5k and 18% on lc; the rest is the sphere assumption
+  at the jamming limit, not a tuning failure
+
+The page has an interactive viewer (plain canvas 2D, no three.js, no CDN): drag
+to rotate, scroll to zoom, step through phenotypes, and a cross-section toggle
+that hides everything below `z = 0` — the cells that remain are the ones the knife
+actually cut.
 
 ## Install
 
@@ -44,6 +73,7 @@ python tools/train_cnn.py --tiles work/5k_tiles.npz work/lc_tiles.npz \
     --epochs 80 --clusters 64 --out work/cnn_tiles.npz
 python tools/cluster_tiles.py --tags 5k lc --img --expr --ann --name fused
 python tools/make_figures.py --name fused --tags 5k lc
+python tools/build_3d.py --tag 5k --block 1 --slab-um 6   # 2D -> 3D
 ```
 
 `cluster_tiles.py` takes `--img/--expr/--ann` independently, so any subset is an
@@ -111,6 +141,8 @@ tools/extract_tiles.py        HIPPO-style tiling, Reinhard, three modalities
 tools/train_cnn.py            contrastive CNN on tiles
 tools/cluster_tiles.py        HIPPO eq. 1-3 on the fused block, with ablations
 tools/make_figures.py         gallery / spatial / heatmap panels
+tools/build_3d.py             2D -> 3D cell inference (sectioning relation)
+tools/viewer3d.py             the interactive canvas viewer for the page
 tools/build_page.py           generate docs/index.html
 docs/index.html               the walkthrough
 ```
