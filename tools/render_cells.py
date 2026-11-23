@@ -245,12 +245,13 @@ def glass_box(span: float, height: float, pad: float) -> None:
     wire = bpy.context.active_object
     wire.scale = (size.x, size.y, size.z)
     modifier = wire.modifiers.new("wire", "WIREFRAME")
-    # 0.0016 was invisible, 0.004 too harsh; the reference reads as a faint line
-    modifier.thickness = 0.0026
+    # 0.0016 / emission 0.35 straight from the reference; my 0.004 / 0.9 made the
+    # cage compete with the subject
+    modifier.thickness = 0.0016
     modifier.use_replace = True
-    edge = principled("edge", (0.62, 0.50, 0.66), roughness=0.30,
+    edge = principled("edge", (0.55, 0.32, 0.62), roughness=0.28,
                       transmission=0.05, subsurface=0.0, scale=0.0, ior=1.4,
-                      coat=0.2, emission=0.5)
+                      coat=0.2, emission=0.35)
     wire.data.materials.append(edge)
     wire.visible_shadow = False
 
@@ -299,22 +300,21 @@ def overview(model: dict, zscale: float, samples: int, resolution: int) -> None:
     cells = model["cells"]
     for index, cell in enumerate(cells):
         rng = random.Random(index + 3)
-        # per-cell hue and value jitter: the reference runs from salmon through
-        # lavender to pale blue-grey, and a single flat colour is what made the
-        # first version read as plastic beads rather than cells
-        base = grape_lift(cell["color"], 0.45, 1.30)
+        # Annotile's parameters, unchanged.  Three rounds of "improving" them
+        # (transmission 0.08 -> 0.44 -> 0.74 -> 0.86, roughness up, coat down)
+        # each moved the result further from the reference: the translucency in
+        # that render comes from subsurface plus the coat sheen under a bright
+        # environment, not from transmission.
+        base = grape(cell["color"], 0.62)
         hue = rng.uniform(-0.10, 0.10)
-        val = rng.uniform(0.86, 1.16)
+        val = rng.uniform(0.92, 1.06)
         color = (min(1.0, max(0.0, base[0] * val + hue)),
                  min(1.0, max(0.0, base[1] * val + hue * 0.35)),
                  min(1.0, max(0.0, base[2] * val - hue * 0.5)))
         radius = float(cell["r"])
-        # transmission carries the look: at 0.44 the rear cells were still
-        # hidden.  Roughness is raised at the same time so the highlight spreads
-        # into the wide soft sheen the reference has instead of a hard dot.
-        material = principled(f"body_{index}", color, roughness=0.42,
-                              transmission=0.86, subsurface=0.35,
-                              scale=radius * 0.30, ior=1.32, coat=0.25)
+        material = principled(f"body_{index}", color, roughness=0.2,
+                              transmission=0.08, subsurface=0.45,
+                              scale=radius * 0.35, ior=1.4, coat=0.7)
         location = Vector((float(cell["x"]), float(cell["y"]),
                            float(cell["z"]) * zscale))
         wobble = tuple(rng.uniform(0.94, 1.06) for _ in range(3))
@@ -329,9 +329,8 @@ def overview(model: dict, zscale: float, samples: int, resolution: int) -> None:
     glass_box(span, height, pad=1.5)
     center = Vector((span / 2, span / 2, height / 2))
     direction = Vector((0.95, -1.25, 0.72)).normalized()
-    # 3.35 filled half the frame; 4.3 puts the block at roughly a third, which
-    # is how much of the plate the reference leaves visible around it
-    distance = max(span, height) * 4.3
+    # 3.35 and 0.85 are the reference values; my 4.3 / 1.7 both overshot
+    distance = max(span, height) * 3.35
     add_area("key", center + Vector((-span * 0.8, -span * 1.5, height * 1.8)),
              4500, (1.0, 0.95, 0.92), span * 1.3)
     add_area("fill", center + Vector((span * 1.4, -span * 0.2, height * 0.4)),
@@ -341,9 +340,8 @@ def overview(model: dict, zscale: float, samples: int, resolution: int) -> None:
     camera = add_camera(center + direction * distance, center, 42, 5.6, center)
     backdrop = ROOT / model.get("backdrop", "")
     if backdrop.is_file():
-        # 0.85 left the plate too sharp relative to the reference; pushing it
-        # further behind the focal plane lets the camera's own defocus soften it
-        backdrop_plane(str(backdrop), camera, max(span, height) * 1.7)
+        # 0.85 is the reference offset behind the focal plane
+        backdrop_plane(str(backdrop), camera, max(span, height) * 0.85)
 
 
 def closeup(model: dict, zscale: float, samples: int, resolution: int) -> None:

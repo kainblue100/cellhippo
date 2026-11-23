@@ -42,19 +42,45 @@ RADIUS_UM = {
     "Tfh_CXCL13_region": 5.0, "b": 4.2, "plasma": 5.0, "mph": 7.0, "mast": 5.5,
 }
 
-# a muted, per-type colour; the renderer pulls all of these toward one purple
+# Annotile's cell-type palette, verbatim.  An earlier version used invented
+# muted pinks and the render came out a dark plum: grape() mixes 62% toward one
+# magenta, so a desaturated source lands below the target's value instead of
+# around it.  Starting from these saturated hues is what gives the reference its
+# rose/lavender range.
 TYPE_COLOR = {
-    "epi": "#c98f9e", "epi?": "#c49aa6", "normal_epi": "#cbb0a8",
-    "AT1": "#b9a6b8", "AT2_like": "#c0a9b4", "cil": "#b7a2ab",
-    "endo": "#b58fa8", "endo?": "#ad8ba2", "lymph_endo": "#a88ba0",
-    "fib": "#bfa396", "fib_activated": "#c2a898", "fib_SYNPO2": "#b8a08f",
-    "nkt": "#9d8fb0", "Tfh_CXCL13_region": "#a293b4", "b": "#9a8fb2",
-    "plasma": "#a89ab8", "mph": "#b194a8", "mast": "#b69aa2",
+    "epi": "#c2410c", "epi?": "#fb923c", "normal_epi": "#fdba74",
+    "AT1": "#fde68a", "AT2_like": "#eab308", "cil": "#0f766e",
+    "endo": "#1d4ed8", "endo?": "#60a5fa", "lymph_endo": "#312e81",
+    "fib": "#65a30d", "fib_activated": "#166534", "fib_SYNPO2": "#a3e635",
+    "nkt": "#7c3aed", "Tfh_CXCL13_region": "#c4b5fd", "b": "#db2777",
+    "plasma": "#f9a8d4", "mph": "#b45309", "mast": "#78716c",
 }
 
 
 def radius_of(label: str) -> float:
     return RADIUS_UM.get(label, 6.0)
+
+
+# The annotation notes mark these groups as mixed, unused or too uncertain.  Not
+# filtering them was a real defect: the densest 40 um patch then landed on a
+# low-quality cell run or an immune aggregate, which is not what the pattern is
+# named for.  epi? and endo? are kept because the source notes say those two were
+# checked against the image and retained.
+DROP_EXACT = frozenset({"low_feat_cell", "mph_CXCL9_region", "fib?",
+                        "nkt?CCL19", "lymph_endo?CCL19"})
+KEEP_MARKED = frozenset({"epi?", "endo?"})
+
+
+def keep_label(label: str) -> bool:
+    if label in DROP_EXACT:
+        return False
+    if "?" in label and label not in KEEP_MARKED:
+        return False
+    return True
+
+
+def keep_label_mask(cells: pd.DataFrame):
+    return cells["annotation"].astype(str).map(keep_label).to_numpy()
 
 
 def densest(cells: pd.DataFrame, size: float, step: float = 8.0) -> pd.DataFrame:
@@ -165,8 +191,9 @@ def main():
         cells = cells.assign(
             pattern=[key2ph.get(int(rw) * 100000 + int(cl), -1)
                      for rw, cl in zip(row, col)])
+        cells = cells[keep_label_mask(cells)]
         cells = cells[cells["pattern"] >= 0]
-        print(f"=== {t} ===  {len(cells):,} cells with a pattern, "
+        print(f"=== {t} ===  {len(cells):,} cells after label filtering, "
               f"{cells['pattern'].nunique()} patterns")
 
         for g in range(G):

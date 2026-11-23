@@ -325,7 +325,104 @@ the true 3D shape of these cells — a single section does not contain it, and t
 reference figure this follows has the same limitation.</div>
 
 
-<h2>7. What this does not show</h2>
+<h2>7. Step-by-step comparison with Annotile</h2>
+<p><a href="https://kainblue100.github.io/annotile/">Annotile</a> solves the same
+problem and, step for step, does most of it better. This table is read against its
+source, not its prose.</p>
+
+<table>
+<thead><tr><th style="width:16%">step</th><th style="width:26%">here</th>
+<th style="width:26%">Annotile</th><th style="width:32%">verdict</th></tr></thead>
+<tbody>
+<tr><td>cell labels</td><td>all annotations used as given</td>
+<td><span class="mono">keep_label</span> drops <span class="mono">low_feat_cell</span>,
+<span class="mono">mph_CXCL9_region</span>, <span class="mono">fib?</span>,
+<span class="mono">lymph_endo?CCL19</span> and any other <span class="mono">?</span>
+label except <span class="mono">epi?</span>/<span class="mono">endo?</span></td>
+<td><strong>theirs.</strong> Ours let the densest patch land on a low-quality
+cell run; that is exactly what happened to P0 and P2 before the fix.</td></tr>
+
+<tr><td>window size</td><td>224 px of the H&E pyramid — 243 µm on 5k but 112 µm on
+lc</td><td>400 µm in micron space, identical on every slide</td>
+<td><strong>theirs, decisively.</strong> A tile defined in pixels is a different
+amount of tissue on each slide, so the same pattern cannot mean the same thing in
+both. This is the most serious flaw in our chain.</td></tr>
+
+<tr><td>minimum cells</td><td>≥10 cells and ≥60% stained tissue</td>
+<td>≥30 cells</td><td>theirs; 10 is low enough to keep windows whose composition
+is mostly noise.</td></tr>
+
+<tr><td>H&amp;E registration</td><td>rotation from the matrix, scale measured from
+cell size, translation by second-moment matching</td>
+<td>the matrix as shipped, with a brightness check: if the median crop is ≥235
+the inverse is used instead</td>
+<td><strong>theirs for effort, ours for evidence.</strong> Their check resolves
+only the direction, yet it evidently suffices. Our elaborate fit was driven by a
+real 2.84× disagreement between the matrix and the OME metadata — worth asking
+whether that disagreement is real or an artefact of how we read the units.</td></tr>
+
+<tr><td>H&amp;E features</td><td>a contrastive CNN trained on the tiles, 128 dims</td>
+<td>7 handcrafted numbers: mean RGB, std RGB, gradient magnitude</td>
+<td><strong>ours.</strong> A learned embedding can separate tissue textures that
+seven summary statistics cannot. This is the one place our chain is stronger.</td></tr>
+
+<tr><td>stain normalisation</td><td>Reinhard, source stats per slide, target fixed</td>
+<td>none</td><td>ours, in principle — though it also means our image features are
+not on the same scale as theirs.</td></tr>
+
+<tr><td>expression features</td><td>32 PCs per slide, computed independently</td>
+<td><strong>153 genes shared by all three slides</strong>, then 16 PCs</td>
+<td><strong>theirs.</strong> PCs from separate slides are not on a common axis, so
+the expression block is not comparable across slides. Their shared-gene panel
+fixes that.</td></tr>
+
+<tr><td>fine clusters</td><td>k fixed at 64</td>
+<td>k ∈ {6…20}, chosen by silhouette with a 0.01 margin → 10</td>
+<td><strong>theirs.</strong> 64 was HIPPO's number on 227k tiles; on 2,086 it is
+arbitrary and the silhouette says so.</td></tr>
+
+<tr><td>merge to patterns</td><td>Pearson correlation of centroids → GMM on the
+correlation matrix, G ≤ 15</td>
+<td>standardised fine-cluster mean vectors → diagonal GMM on those vectors,
+G ≤ 8; the correlation matrix is <em>not</em> used as input</td>
+<td><strong>theirs, and it is a correction to HIPPO itself.</strong> A
+correlation matrix has as many rows as columns and a full covariance is
+unstable — Annotile says so explicitly. We followed the paper literally.</td></tr>
+
+<tr><td>pattern naming</td><td>cluster index</td><td>ranked by cell count, P1…P8</td>
+<td>theirs; ours makes the labels meaningless across runs.</td></tr>
+
+<tr><td>spatial coherence</td><td>judged by eye from the map</td>
+<td><span class="mono">_neighbor_agreement</span> — fraction of adjacent windows
+sharing a pattern, 83.6%</td>
+<td><strong>theirs.</strong> We asserted autocorrelation; they measured it.</td></tr>
+
+<tr><td>3D model</td><td>radius inverted from the segmented 2D area, z by
+optimisation under non-overlap</td>
+<td>radius from a cell-type prior, z by relaxation in a 10 µm section</td>
+<td><strong>theirs.</strong> Inverting one apparent area for two unknowns needed
+an identifiability argument and still left residual overlap to report.</td></tr>
+
+<tr><td>3D rendering</td><td>a hand-written volume renderer, then Blender with
+invented parameters</td>
+<td>Blender with measured parameters: glass box, per-type saturated palette,
+H&amp;E plate behind the focal plane</td>
+<td><strong>theirs.</strong> Our first Blender pass also used an invented muted
+palette, which is why the spheres came out dark plum instead of rose.</td></tr>
+
+<tr><td>slides</td><td>2 (5k, lc)</td><td>3 (+ luad)</td><td>theirs.</td></tr>
+</tbody></table>
+
+<div class="callout warn">
+<strong>Honest tally.</strong> Of fourteen steps, Annotile is better on eleven,
+ours on two (learned image embedding, stain normalisation), and one is a genuine
+trade-off (registration). The window-size and shared-gene-axis points are not
+cosmetic: they mean patterns from this chain cannot be compared across slides the
+way Annotile's can, which undercuts its main claim. If the goal is the result
+rather than the exercise, Annotile is the implementation to use.
+</div>
+
+<h2>8. What this does not show</h2>
 <div class="callout warn">
 <ul style="margin:0;padding-left:20px">
 <li><strong>Two slides.</strong> 2,086 tiles from 5k and lc. HIPPO used 227,000
@@ -345,7 +442,7 @@ differences the clustering is supposed to see.</li>
 </ul>
 </div>
 
-<h2>8. Reproducing</h2>
+<h2>9. Reproducing</h2>
 <pre>python tools/fetch_10x_all.py            # matrices + coordinates + H&amp;E
 python tools/register_final.py          # rotation, scale, translation
 python tools/extract_tiles.py --tag 5k  # HIPPO-style tiling + three modalities
