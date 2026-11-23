@@ -1,0 +1,54 @@
+{
+  "tag": "5k",
+  "level": 2,
+  "um_per_px": 1.0827414346174942,
+  "tile_px": 224,
+  "n_tiles": 722,
+  "n_tiles_all": 1102,
+  "tissue_min": 0.6,
+  "min_cells": 10,
+  "reinhard_src_mean": [
+    68.34679830733812,
+    43.28631715392981,
+    -20.182939852358714
+  ],
+  "reinhard_src_std": [
+    15.6801474143625,
+    19.409461655625563,
+    9.89578018012832
+  ],
+  "reinhard_tgt_mean": [
+    68.34679830733812,
+    43.28631715392981,
+    -20.182939852358714
+  ],
+  "reinhard_tgt_std": [
+    15.6801474143625,
+    19.409461655625563,
+    9.89578018012832
+  ],
+  "image_shape": [
+    10818,
+    6680
+  ],
+  "cells_in_frame": 0.9681426301295003,
+  "annotations": [
+    "AT1",
+    "AT2_like",
+    "b",
+    "cil",
+    "endo",
+    "epi",
+    "epi?GRP",
+    "fib",
+    "fib_SYNPO2",
+    "fib_activated",
+    "low_feat_cell",
+    "lymph_endo?CCL19",
+    "mast",
+    "mph",
+    "mph_CXCL9_region",
+    "nkt",
+    "plasma"
+  ]
+}

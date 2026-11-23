@@ -4,8 +4,12 @@ __pycache__/
 .venv/
 venv/
 work/
+logs/
 *.log
 *.part
 *.tmp
 .DS_Store
 Thumbs.db
+
+# raw diagnostic renders stay local; the publishable copies live in docs/figures
+/figures/

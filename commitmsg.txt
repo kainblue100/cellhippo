@@ -1,0 +1,30 @@
+cellhippo: three-modality tile clustering (H&E + expression + annotation)
+
+Rebuilds HIPPO's phenotype chain with the H&E image actually in the feature
+vector, alongside the Xenium expression matrix and the cell-type annotation the
+original never had. The unit is the tissue tile, as in HIPPO, so the output is a
+phenotype atlas plus a map of where each unit sits on the section.
+
+Imaging conventions follow the reference implementations rather than being
+invented: 224 px tiles, a tissue-coverage filter, Reinhard normalisation and a
+contrastively trained encoder from ZhoulabCPH/HIPOS; the aligned-H&E + nuclei-mask
++ expression input contract from SydneyBioX/GHIST_plus.
+
+Registration was the hard part and is solved from evidence rather than assumed.
+he_imagealignment.csv as shipped disagrees with the OME metadata on the same TIFF
+by a factor of 2.84. Rotation is taken from the matrix (second-moment matching
+reproduces it within 4 degrees on both slides), scale from cell size (11.4 um
+cells measured as 12.1 um at the OME pixel size; 34 um at the matrix's), and
+translation from second-moment matching -- the objectives that failed first, IoU
+and "fraction on tissue", both reward shrinking the cloud and slid to the search
+boundary.
+
+Results: 2,086 tiles from two slides, 64 fine clusters, 5 phenotypes that read as
+anatomical domains (tumour nests, two grades of fibrous stroma, a mixed
+stroma+lymphocyte+haemorrhage region, and gland-forming epithelium). The spatial
+map shows strong autocorrelation, so the phenotypes are regions rather than noise.
+
+Two slides is not a cohort, these datasets carry no survival follow-up, and G is
+whatever BIC picks rather than a result -- all stated in the page.
+
+Co-authored-by: CommandCodeBot <noreply@commandcode.ai>

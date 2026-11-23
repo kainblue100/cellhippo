@@ -1,120 +1,116 @@
 # cellhippo
 
-HIPPO's histomorphological phenotype chain, rebuilt for cell tables that already
-carry an annotation.
+HIPPO's phenotype-discovery chain, run on three modalities at once: the **H&E
+image**, the **Xenium expression matrix**, and the **cell-type annotation** the
+original method never had.
 
 HIPPO ([Zhang et al., *Genome Medicine* 2025;17:98](https://doi.org/10.1186/s13073-025-01526-5))
-takes unlabelled H&E tiles, contrastively clusters them into 64 groups, merges the
-64×64 inter-cluster correlation matrix with a BIC-selected Gaussian mixture model
-into ~15 phenotypes, turns each patient into a phenotype-fraction vector, and
-consensus-clusters those vectors into subtypes. It works, and nothing external can
-contradict it: tiles carry no label, so "new pattern" and "relabelling" are
-indistinguishable by construction.
+tiles H&E slides, clusters the tiles contrastively into 64 groups, correlates the
+cluster centroids, and merges them with a BIC-selected Gaussian mixture into
+histomorphological phenotypes. Its tiles carry no label, so nothing external can
+contradict them. Here each tile also knows which cell types it contains, and the
+image sits in the feature vector alongside the expression — so the two can be
+ablated against each other instead of asserted.
 
-This tool keeps the chain and adds one input dimension — a per-cell annotation. The
-annotation enters twice: inside the cell state vector, and as an external yardstick.
-The second use answers a question the original cannot: **does a discovered phenotype
-split an annotated cell type, or merely restate it?**
+**[Read the walkthrough](docs/index.html)** — registration, tiling, clustering,
+figures, ablations.
 
-**[Read the walkthrough](docs/index.html)** — full pipeline, per-step results, and
-the run-by-run numbers.
+## Pipeline
 
-## Method
-
-| step | what happens | HIPPO analogue |
+| step | what happens | reference |
 |---|---|---|
-| 1 | cell state vector: one-hot labels + z-scored numeric features | tile features |
-| 2 | k-means to k = 64 fine clusters | contrastive clustering |
-| 3 | Pearson between cluster centroids → diagonal GMM over G = 2..20 by BIC | eq. 1–3, unchanged |
-| 4 | each cell inherits its fine cluster's phenotype | HIPO assignment |
-| 5 | ARI/NMI vs the annotation + per-annotation split share | not in the original |
-| 6 | slide phenotype profiles → consensus clustering | eq. 4 + ConsensusClusterPlus |
-
-Step 6 runs only when there are enough slides to make a consensus meaningful;
-otherwise it reports why it was skipped.
+| 1 | register cells to the H&E: rotation from `he_imagealignment.csv`, scale from the OME `PhysicalSizeX`, translation by second-moment matching | this port |
+| 2 | tile 224×224 px at ~1 µm/px, non-overlapping, ≥60% stained tissue, ≥10 cells | HIPOS |
+| 3 | Reinhard stain normalisation in LAB, cross-slide (source stats per slide, target fixed) | HIPOS |
+| 4 | contrastive CNN trained from scratch on the tiles, 128-dim embedding | HIPOS step 1 |
+| 5 | fuse image ⊕ expression PCs ⊕ annotation fractions, z-scored per block | GHIST+ input contract |
+| 6 | k-means (k=64) → Pearson between centroids → diagonal GMM with G by BIC | HIPPO eq. 1–3 |
+| 7 | representative-tile gallery, spatial unit map, composition heatmaps | HIPPO Figs 2C, 3A, 5B |
 
 ## Install
 
 ```bash
-pip install numpy pandas scipy scikit-learn h5py pyarrow
+pip install numpy pandas scipy scikit-learn h5py pyarrow tifffile \
+            imagecodecs pillow scikit-image torch
 ```
 
 ## Use
 
 ```bash
-PYTHONPATH=src python -m cellhippo.run \
-    --csv cells.parquet \
-    --annotation annotation \
-    --second-label cluster \
-    --features PC1,PC2,PC3 \
-    --slide slide \
-    --k 64 \
-    --out result.json
+python tools/fetch_10x_all.py            # matrices + coordinates + H&E
+python tools/register_final.py           # rotation, scale, translation
+python tools/extract_tiles.py --tag 5k   # tiling + three modalities
+python tools/train_cnn.py --tiles work/5k_tiles.npz work/lc_tiles.npz \
+    --epochs 80 --clusters 64 --out work/cnn_tiles.npz
+python tools/cluster_tiles.py --tags 5k lc --img --expr --ann --name fused
+python tools/make_figures.py --name fused --tags 5k lc
 ```
 
-Input contract:
-
-- `cell_id` — required, unique
-- `annotation` — required; the extra dimension
-- a second categorical column (`--second-label`) — optional
-- numeric columns named in `--features` — optional
-- `slide` (`--slide`) — optional; without it step 6 is skipped, not faked
-
-Accepts CSV or parquet. Output is a JSON with the BIC curve, phenotype sizes,
-phenotype ↔ annotation composition, ARI/NMI, and the per-annotation split table.
+`cluster_tiles.py` takes `--img/--expr/--ann` independently, so any subset is an
+ablation.
 
 ## Results
 
-Four runs, all on real 10x Xenium data joined to the
-[GHIST_input](https://github.com/D10ny3u3/GHIST_input) annotations:
+2,086 tiles from two Xenium slides (5k: 722, lc: 1,364). The fused run gives 64
+fine clusters and 5 phenotypes:
 
-| set | cells | fine clusters | phenotypes | ARI | NMI | annotations split |
-|---|---|---|---|---|---|---|
-| 5k | 278,146 | 64 | 10 | 0.572 | 0.657 | 13 / 17 |
-| lc | 160,448 | 64 | 6 | 0.555 | 0.592 | 9 / 14 |
-| luad | 161,894 | 64 | 5 | 0.488 | 0.554 | 7 / 10 |
-| pooled (label-only control) | 600,488 | 64 | 9 | 0.761 | 0.800 | 4 / 23 |
-
-The control is the point. With label-only features the pipeline reaches ARI 0.761
-and leaves 19 of 23 annotations intact at 100% agreement — it can only echo its
-inputs. Adding 32 expression PCs *lowers* ARI to 0.49–0.57 and raises splits to
-7–13 per run. Agreement with the annotation drops while the pipeline recovers every
-major cell type and cuts several into states the annotation does not name.
-
-## Provenance
-
-The GHIST tables carry no expression, so the matching 10x matrices were located
-from the dataset URLs in the source notes and downloaded. The mapping is verified by
-barcode overlap, not assumed:
-
-| GHIST set | 10x dataset | join coverage |
+| phenotype | n tiles | dominant morphology |
 |---|---|---|
-| 5k | `Xenium_Prime_Human_Lung_Cancer_FFPE` | 99.93% |
-| lc | `Xenium_V1_Human_Lung_Cancer_Addon_FFPE` | 99.66% |
-| luad | `Xenium_V1_humanLung_Cancer_FFPE` | 99.78% |
+| P0 | 39 | tumour/epithelial nests, gland-like |
+| P1 | 275 | dense collagenous stroma, paucicellular |
+| P2 | 42 | fibrous stroma, more uniform, less pigment |
+| P3 | 338 | mixed: stroma + lymphocyte clusters + haemorrhage |
+| P4 | 28 | gland-forming epithelium, desmoplastic stroma |
+
+The spatial map shows strong autocorrelation — neighbouring tiles mostly share a
+phenotype, with smooth boundaries between large domains — so the phenotypes
+correspond to anatomical regions rather than noise.
+
+## Registration
+
+`he_imagealignment.csv` could not be used as shipped: its linear part implies
+1.288 px/µm while the OME metadata on the same TIFF says 0.2738 µm/px, a factor
+2.84 apart, and the translation term corresponds to neither.
+
+Each component was fixed from independent evidence:
+
+- **rotation** — the matrix's own −89.6°, which second-moment matching reproduces
+  at −85.6° and −93.4° on the two slides (within 4°)
+- **scale** — `cell_area` gives an 11.4 µm cell on lc; the nuclei measured in the
+  H&E at the OME pixel size are 12.1 µm. At the matrix's scale they would be
+  34 µm, which is not a lung cell. Moment matching gives 0.271 µm/px against the
+  OME's 0.274
+- **translation** — second-moment matching of the cell cloud's covariance ellipse
+  to the tissue mask
+
+Earlier attempts failed in instructive ways, all documented in
+`tools/register_final.py` and the page: IoU and "fraction of cloud on tissue" both
+reward shrinking the cloud and slid to the search boundary, and the first tissue
+mask found 30% tissue where the eye sees 60% because Otsu on luminance misses pale
+stroma.
 
 ## Limitations
 
-- **No survival endpoint.** HIPPO validates subtypes against OS/DFS. These datasets
-  ship no clinical follow-up, so the prognostic half is untestable here.
-- **Three slides.** The slide-level consensus step is implemented and deliberately
-  not exercised.
-- **A split is not automatically meaningful.** It can be biology, cell-cycle
-  structure, a dissociation artefact, or a coarse annotation. The tool reports the
-  split and its size and does not adjudicate.
-- **k-means, not contrastive learning** for step 2 — the main approximation in
-  this port.
+- **Two slides, 2,086 tiles.** HIPPO used 227,000 tiles from 209 patients. Nothing
+  here supports a population claim.
+- **No survival endpoint.** These datasets ship no clinical follow-up, so HIPPO's
+  prognostic half is untestable.
+- **The image encoder is small** — 1.21 M parameters against HIPPO's ResNet50 on
+  a 100× larger tile set. Contrastive loss fell 4.08 → 0.85, but the image branch
+  is the weakest part of this port.
+- **G is not a result.** Phenotype counts move with the BIC cap and the block
+  weighting; the ablations are for reading the galleries side by side.
 
 ## Layout
 
 ```
-src/cellhippo/run.py          the tool
-tools/find_10x_datasets.py    locate the source datasets on the 10x CDN
-tools/fetch_10x_all.py        pull the 10x matrices + coordinates
-tools/map_ghist_to_10x.py     verify the mapping by barcode overlap
-tools/inspect_h5.py           dump the h5 layout
-tools/assemble.py             join expression + annotation + coordinates, PCA
-tools/make_payload.py         distil results for the page
+src/cellhippo/run.py          HIPPO chain for annotated cell tables (no image)
+tools/fetch_10x_all.py        matrices + coordinates + H&E from the 10x CDN
+tools/register_final.py       rotation / scale / translation, with the evidence
+tools/extract_tiles.py        HIPPO-style tiling, Reinhard, three modalities
+tools/train_cnn.py            contrastive CNN on tiles
+tools/cluster_tiles.py        HIPPO eq. 1-3 on the fused block, with ablations
+tools/make_figures.py         gallery / spatial / heatmap panels
 tools/build_page.py           generate docs/index.html
 docs/index.html               the walkthrough
 ```
