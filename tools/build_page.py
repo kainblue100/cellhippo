@@ -330,38 +330,48 @@ at a time. The cross-section toggle hides everything below
 at — the cells that remain are the ones the knife cut through.</p>
 
 <h3>Volume render</h3>
-<p>Free spheres and metaballs were tried first, in Blender, and both capped out
-around 3–5/10. That is the expected ceiling: a surface mesh cannot produce
-internal scattering or depth falloff, and no amount of material tuning fixes it.
-The render below is a front-to-back emission-absorption ray march instead —
-per-sample opacity, shading from the density gradient, filmic shoulder — which is
-the technique that can produce this kind of image.</p>
+<p>The Blender route was abandoned too early the first time. The mistake was the
+model, not the renderer: the 3D geometry was being <em>inverted</em> from the
+segmented 2D area, which needed an identifiability argument and still left
+residual overlap. The construction used here is simpler and better behaved, and
+it is the one the Annotile project settled on:</p>
 
-<figure><img src="figures/5k_volume.png"
- alt="volume render of the inferred 3D cell model, 5k">
- <figcaption>5k. 21 cells in a 60 × 60 × 25 µm field, each drawn as its inferred
- radius with a denser core. Per-sample opacity is ~0.009, which integrates to about
- half over the ~300 march steps; the earlier value of 0.004 integrated to 0.23 and
- measured <span class="mono">mean 12.8</span> — nearly empty.</figcaption></figure>
-
-<figure><img src="figures/lc_volume.png"
- alt="volume render of the inferred 3D cell model, lc">
- <figcaption>lc. Same treatment, 25 cells. Pixel statistics for both:
- <span class="mono">mean 24–32, max 207–224, corner [0,0,0], lit 26–29%</span> —
- inside the range where a volume render is neither empty nor blown out.</figcaption></figure>
-
-<div class="callout warn">
-<strong>What this render is not.</strong> It is not at the level of the reference
-figure, and the reason is the data rather than the renderer. That figure is a
-volume rendering of a real three-dimensional microscopy stack: cells with
-membranes, nuclei, and internal texture at many depths. This model is twenty
-uniform spheres whose positions were <em>inferred</em> from a single section, so
-the only structure available to render is the sphere itself and the core drawn
-inside it. The arithmetic also constrains the shape: cells sit ~12 µm apart at
-this density, so a field wide enough to hold forty of them is ~85 µm across while
-<span class="mono">z</span> spans only ±6 µm — a wafer, not a block. Matching the
-reference would need a real z-stack, not a better transfer function.
+<div class="flow">
+ <div class="step"><div class="n">RADIUS</div><div class="t">type prior</div>
+  <div class="d">epi 8.5 µm, endo 5.5, nkt 4.5, and so on — not an inversion of
+  the apparent area. No identifiability problem, and no residual overlap to
+  report as a caveat.</div></div>
+ <div class="step"><div class="n">DEPTH</div><div class="t">relaxation</div>
+  <div class="d">centres start uniform in a 10 µm section, then are pushed apart
+  along z until the spheres stop interpenetrating.</div></div>
+ <div class="step"><div class="n">PATCH</div><div class="t">densest 40 µm</div>
+  <div class="d">widened to 80 then 120 µm if it holds fewer than 20 cells, capped
+  at 160. Each of our ten patterns lands 33–54 cells.</div></div>
+ <div class="step"><div class="n">DEPTH ×4</div><div class="t">drawn, not measured</div>
+  <div class="d">z is multiplied by 4 for display only. A 10 µm section against a
+  40 µm patch is otherwise a wafer; the radii stay in micrometres.</div></div>
 </div>
+
+<figure><img src="figures/sheet_cube.png"
+ alt="Blender glass-box renders of every pattern">
+ <figcaption>Every pattern as a glass block on its own H&amp;E. Blender Cycles,
+ 42 mm lens at f/5.6, membrane + cytoplasm + nucleus per cell, plate composited
+ behind the focus plane so the camera's own defocus softens it. Top row 5k,
+ bottom row lc.</figcaption></figure>
+
+<figure><img src="figures/sheet_close.png"
+ alt="Close-up of one cell per pattern">
+ <figcaption>The same models at close range: the largest cell of each block plus
+ its two nearest neighbours, with a thin bump-mapped membrane over a denser
+ cytoplasm and a dark nucleus.</figcaption></figure>
+
+<div class="callout">
+<strong>What this is not.</strong> The spheres are a cell model, not a
+measurement. Their radii come from a cell-type prior, their depth from an overlap
+relaxation inside an assumed 10 µm section, and their positions from the Xenium
+centroids. The H&amp;E behind them is real and registered. Nothing here recovers
+the true 3D shape of these cells — a single section does not contain it, and the
+reference figure this follows has the same limitation.</div>
 
 
 <h2>7. What this does not show</h2>
