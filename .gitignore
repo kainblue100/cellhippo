@@ -13,3 +13,6 @@ Thumbs.db
 
 # raw diagnostic renders stay local; the publishable copies live in docs/figures
 /figures/
+
+# third-party reference code, read locally only
+/refs/
