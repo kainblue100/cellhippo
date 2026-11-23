@@ -48,7 +48,7 @@ def fit(im, w, h):
 
 
 def build_frames(tag, traj, renders, comps, outdir, size=1100, fps=12,
-                 frames_per_seg=14, meta=None):
+                 frames_per_seg=14, meta=None, lung=None):
     meta = meta or {}
     slide = traj["slides"][tag]
     order = [int(p) for p in slide["order"]]
@@ -84,7 +84,30 @@ def build_frames(tag, traj, renders, comps, outdir, size=1100, fps=12,
             ia = ia.resize((left_w, left_w), Image.LANCZOS)
             ib = ib.resize((left_w, left_w), Image.LANCZOS)
             mixed = Image.blend(ia, ib, float(te))
-            canvas.paste(mixed, (0, (H - left_w) // 2))
+
+            panel = Image.new("RGB", (left_w, left_w), "white")
+            if lung is not None:
+                # The lung silhouette covers only ~30% of its frame and the
+                # inset covers 60%^2 = 36%, so a 60% inset hid the lung almost
+                # entirely -- the first check found pure white in every corner.
+                # The inset is 50% now and the lung is composited through its
+                # alpha rather than by convert("RGB"), which discards it.
+                # the crop is not square, so fit by its long side and centre --
+                # stretching it to the panel would distort the lung
+                lg = lung.copy()
+                lg.thumbnail((left_w, left_w), Image.LANCZOS)
+                white = Image.new("RGBA", (left_w, left_w), (255, 255, 255, 255))
+                white.paste(lg, ((left_w - lg.width) // 2,
+                                 (left_w - lg.height) // 2), lg)
+                panel = Image.blend(Image.new("RGB", (left_w, left_w), "white"),
+                                    white.convert("RGB"), 0.62)
+                inner = int(left_w * 0.42)
+                small = mixed.resize((inner, inner), Image.LANCZOS)
+                off = (left_w - inner) // 2
+                panel.paste(small, (off, off))
+            else:
+                panel = mixed
+            canvas.paste(panel, (0, (H - left_w) // 2))
 
             cur = a if te < 0.5 else b
             dr.text((panel_x, 24), f"{tag}   P{cur}", fill=(26, 26, 30),
@@ -152,6 +175,14 @@ def build_frames(tag, traj, renders, comps, outdir, size=1100, fps=12,
                         f"{meta.get((tag, cur), {}).get('patch', '?')} um block",
                         fill=(140, 138, 146), font=font(13))
 
+            # provenance under the panel: the silhouette is an atlas, the inset
+            # is the measurement, and the label says which is which
+            if lung is not None:
+                dr.text((14, H - 30),
+                        "pale lung = reference anatomy (BodyParts3D), not this "
+                        "specimen;  inset = measured block",
+                        fill=(150, 140, 148), font=font(12))
+
             # provenance, because the ordering is a model and should say so
             dr.text((panel_x, H - 74),
                     "ordering only — no velocity: Xenium has mature transcripts",
@@ -193,6 +224,8 @@ def main():
     ap.add_argument("--outdir", default=os.path.join(VOL, "movie"))
     ap.add_argument("--size", type=int, default=1100)
     ap.add_argument("--fps", type=int, default=12)
+    ap.add_argument("--lung", default=os.path.join(VOL, "lung_silhouette.png"),
+                    help="reference-anatomy plate; omit for no backdrop")
     a = ap.parse_args()
 
     traj = json.load(open(a.traj))
@@ -211,10 +244,20 @@ def main():
         meta[(tag, pat)] = {"cells": m["cells_in_patch"],
                             "patch": int(m["patch_um"])}
 
+    lung = None
+    if a.lung and os.path.exists(a.lung):
+        raw = Image.open(a.lung).convert("RGBA")
+        # crop to the alpha bounding box first: the render carries a wide empty
+        # margin, so resizing the full frame left the lung small and pale inside
+        # the panel and the check found only a 5-level tint
+        bbox = raw.getchannel("A").getbbox()
+        lung = raw.crop(bbox) if bbox else raw
+        print(f"lung backdrop: {raw.size} -> cropped {lung.size}")
+
     for tag in traj["slides"]:
         print(f"=== {tag} ===")
         build_frames(tag, traj, renders, comps, a.outdir, a.size, a.fps,
-                     meta=meta)
+                     meta=meta, lung=lung)
 
 
 if __name__ == "__main__":

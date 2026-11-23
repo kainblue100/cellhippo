@@ -37,6 +37,26 @@ for _tag in ("5k", "lc"):
                   f'<td>P{weak[0].replace("-", "鈥揚")} '
                   f'({weak[1]*100:.0f}% of resamples)</td></tr>')
 
+TRANS = {}
+_p = os.path.join(DOCS, "transitions.json")
+if os.path.exists(_p):
+    TRANS = json.load(open(_p)).get("slides", {})
+
+trans_rows = ""
+for _tag in ("5k", "lc"):
+    s = TRANS.get(_tag)
+    if not s:
+        continue
+    top = sorted(s["pairs"].items(), key=lambda kv: -kv[1])[:3]
+    bits = []
+    for _k, _v in top:
+        _a, _b = _k.split("-")
+        bits.append(f"P{_a}–P{_b} {_v}")
+    trans_rows += ('<tr><td class="mono">' + _tag + "</td>"
+                   + f'<td class="num">{s["windows"]}</td>'
+                   + f'<td class="num">{s["handovers"]}</td>'
+                   + "<td>" + " · ".join(bits) + "</td></tr>")
+
 PAL = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3"]
 RUNS = [("fused", "image + expression + annotation", fused),
         ("ab_img", "image only", ab_img),
@@ -404,6 +424,58 @@ An earlier version of this analysis built a minimum spanning tree over five
 centroids and produced a tidier-looking chain; that was a weaker object, and the
 tighter picture it drew was not better evidence.</p>
 
+<h3>Two dimensions instead of one</h3>
+<p>The pseudotime axis is a one-dimensional summary, and on these data it stacks
+the patterns rather than separating them. UMAP and t-SNE over the same fused
+features answer a different question: are the patterns separate islands, or one
+continuous manifold? Both projections use the identical feature block, so a
+pattern's position here and on the axis describe the same object.</p>
+
+<figure><img src="figures/5k_embedding.png"
+ alt="UMAP and t-SNE of 5k window embeddings coloured by pattern">
+ <figcaption>5k. UMAP (n_neighbors 30, min_dist 0.25) and t-SNE (perplexity 30),
+ coloured by pattern. Where the two projections agree on which patterns sit
+ together, the grouping is a property of the data rather than of one
+ algorithm's quirks.</figcaption></figure>
+
+<figure><img src="figures/lc_embedding.png"
+ alt="UMAP and t-SNE of lc window embeddings coloured by pattern">
+ <figcaption>lc. Same treatment, 1,364 windows.</figcaption></figure>
+
+<h3>Where the patterns hand over, on the section</h3>
+<p>A pattern map says which pattern sits where; it does not say which patterns
+touch. That is a separate and directly countable object — for every pair of
+adjacent windows assigned to different patterns there is one handover — and it
+needs no embedding, no pseudotime and no model. Counting them gives an adjacency
+matrix of the tissue itself.</p>
+
+<table>
+<thead><tr><th>slide</th><th class="num">windows</th>
+<th class="num">handovers</th><th>most frequent</th></tr></thead>
+<tbody>
+{trans_rows}
+</tbody></table>
+
+<figure><img src="figures/5k_transitions.png"
+ alt="5k pattern map with handover boundaries">
+ <figcaption>5k. Windows tinted by pattern; black bars mark every edge where two
+ adjacent windows carry different patterns.</figcaption></figure>
+
+<figure><img src="figures/lc_transitions.png"
+ alt="lc pattern map with handover boundaries">
+ <figcaption>lc. 1,153 handovers against 5k's 297, which is what a slide with
+ twice the windows and a more interleaved mosaic looks like.</figcaption></figure>
+
+<div class="callout">
+<strong>The one relationship that survives both tests.</strong> P3–P4 is among
+the most frequent handovers on <em>both</em> slides (54 on 5k, 255 on lc), and it
+is also an adjacent pair in both pseudotime orderings. Spatial adjacency and
+diffusion ordering are independent computations — one counts edges on the
+section, the other measures distance in feature space — so agreement between
+them is the strongest single claim this analysis supports. Nothing else in the
+matrix repeats across both donors.
+</div>
+
 <h3>The movie</h3>
 <p>Each frame walks the axis and shows the 3D block of whichever pattern the axis
 is passing through, with the pattern's own cell-type composition beside it. This
@@ -412,15 +484,24 @@ ordering fitted to static snapshots, not of observed time.</p>
 
 <figure><img src="figures/5k_evolution.gif"
  alt="evolution animation along diffusion pseudotime, 5k">
- <figcaption>5k. Root P3, order P3 鈫?P2 鈫?P4 鈫?P0 鈫?P1. The axis bands are each
- pattern's 10th鈥?0th pseudotime percentile, so their width is a readability choice
- and their overlap is real.</figcaption></figure>
+ <figcaption>5k. Root P3, order P3 → P2 → P4 → P0 → P1. The axis bands are each
+ pattern's 10th–90th pseudotime percentile, so their width is a readability choice
+ and their overlap is real. The pale lung behind the block is
+ <strong>reference anatomy</strong> — BodyParts3D's human lung, from the atlas, not
+ a reconstruction of this specimen; only the inset block is measured.</figcaption></figure>
 
 <figure><img src="figures/lc_evolution.gif"
  alt="evolution animation along diffusion pseudotime, lc">
- <figcaption>lc. Root P0, order P0 鈫?P3 鈫?P1 鈫?P4 鈫?P2. Two independent donors
+ <figcaption>lc. Root P0, order P0 → P3 → P1 → P4 → P2. Two independent donors
  give two orders, which is itself informative: the axis reproduces a
  root-to-far structure in both, but the middle of the order does not agree.</figcaption></figure>
+
+<p class="note">The lung is drawn for orientation and is deliberately pale and
+untextured. The <a href="https://kainblue100.github.io/coda-mouse-lung-volume/">CODA
+mouse lung project</a> treats the same atlas asset as deliberately excluded,
+because there the specimen is a mouse; here the species matches, but the
+provenance point is identical — the silhouette is a reference, the cells are the
+measurement, and a figure showing both has to say which is which.</p>
 
 <h2>8. Step-by-step comparison with Annotile</h2>
 <p><a href="https://kainblue100.github.io/annotile/">Annotile</a> solves the same
