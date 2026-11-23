@@ -14,7 +14,7 @@ import os
 
 import numpy as np
 import tifffile
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 
 WORK = "/mnt/storage/bzhang/AIVC/cellhippo/work"
 FIGS = "/mnt/storage/bzhang/AIVC/cellhippo/figures"
@@ -37,6 +37,14 @@ def main():
                          "the tiling level and still fits in memory (level 0 is "
                          "3.5 GB for the 5k slide)")
     ap.add_argument("--size", type=int, default=1100)
+    ap.add_argument("--blur", type=float, default=9.0,
+                    help="Gaussian radius on the plate, in output pixels.  The "
+                         "plate is meant to read as out-of-focus tissue; relying "
+                         "on Blender's thin-lens maths for that was unpredictable "
+                         "at this scene scale, so the defocus is baked in.")
+    ap.add_argument("--desat", type=float, default=0.18,
+                    help="pull saturation down slightly so the plate sits behind "
+                         "the subject instead of competing with it")
     a = ap.parse_args()
 
     scene = json.load(open(a.scene))
@@ -92,6 +100,10 @@ def main():
         crop = img[cy0:cy1, cx0:cx1]
         im = Image.fromarray(crop).resize((a.size, a.size),
                                           Image.Resampling.LANCZOS)
+        if a.blur > 0:
+            im = im.filter(ImageFilter.GaussianBlur(a.blur))
+        if a.desat > 0:
+            im = ImageEnhance.Color(im).enhance(1.0 - a.desat)
         path = os.path.join(outdir, os.path.basename(model["backdrop"]))
         im.save(path)
         model["backdrop"] = os.path.relpath(path, os.path.dirname(a.scene))

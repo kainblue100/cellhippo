@@ -1,4 +1,4 @@
-"""Generate docs/index.html for the three-modality pipeline.
+﻿"""Generate docs/index.html for the three-modality pipeline.
 
 Every number and image reference comes from the run's own JSON, so the page
 cannot drift from what was computed.
@@ -27,6 +27,24 @@ for t in ("5k", "lc"):
     p = os.path.join(DOCS, f"model3d_{t}.json")
     if os.path.exists(p):
         M3D[t] = json.load(open(p))
+
+TRAJ = {}
+_p = os.path.join(DOCS, "trajectory.json")
+if os.path.exists(_p):
+    TRAJ = json.load(open(_p)).get("slides", {})
+
+traj_rows = ""
+for _tag in ("5k", "lc"):
+    s = TRAJ.get(_tag)
+    if not s:
+        continue
+    order = " 鈫?".join(f"P{k}" for k in s["order"])
+    med = ", ".join(f'{s["pseudotime_median"][str(k)]:.3f}' for k in s["order"])
+    weak = min(s["order_stability"].items(), key=lambda kv: kv[1])
+    traj_rows += (f'<tr><td class="mono">{_tag}</td><td>{order}</td>'
+                  f'<td class="num">{med}</td>'
+                  f'<td>P{weak[0].replace("-", "鈥揚")} '
+                  f'({weak[1]*100:.0f}% of resamples)</td></tr>')
 
 PAL = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3"]
 RUNS = [("fused", "image + expression + annotation", fused),
@@ -69,7 +87,7 @@ def html():
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>cellhippo — H&E + expression + annotation, clustered HIPPO-style</title>
+<title>cellhippo 鈥?H&E + expression + annotation, clustered HIPPO-style</title>
 <style>
  :root {{ --ink:#1b1f24; --muted:#5c6672; --line:#e3e7ec; --accent:#3b6ea5;
           --warn:#c0392b; --bg:#fbfcfd; --card:#fff; }}
@@ -132,7 +150,7 @@ def html():
  <h1>cellhippo</h1>
  <p>HIPPO's phenotype-discovery chain, run on three modalities at once: the H&amp;E
  image itself, the Xenium expression matrix, and the cell-type annotation that the
- original method never had. The unit is the tissue tile, as in HIPPO — so the
+ original method never had. The unit is the tissue tile, as in HIPPO 鈥?so the
  output is a phenotype atlas you can look at, plus a map of where each unit sits on
  the section.</p>
 </div></header>
@@ -145,9 +163,9 @@ contrastively into 64 groups, correlate the cluster centroids, and merge them wi
 a BIC-selected Gaussian mixture into ~15 histomorphological phenotypes. Every
 patient then becomes a vector of phenotype fractions. The imaging conventions here
 follow that paper's own code
-(<a href="https://github.com/ZhoulabCPH/HIPOS">ZhoulabCPH/HIPOS</a>) — 224 px tiles,
+(<a href="https://github.com/ZhoulabCPH/HIPOS">ZhoulabCPH/HIPOS</a>) 鈥?224 px tiles,
 a tissue-coverage filter, Reinhard stain normalisation, a contrastively trained CNN
-— and the input contract follows
+鈥?and the input contract follows
 <a href="https://github.com/SydneyBioX/GHIST_plus">GHIST+</a>, which asks for an
 aligned H&amp;E together with a nuclei mask and matched expression.</p>
 
@@ -163,42 +181,42 @@ against each other rather than asserted.
 <h2>2. Getting the image onto the cells</h2>
 <p>The Xenium cell coordinates are in microns; the H&amp;E is in pixels. 10&amp;x
 ships <span class="mono">he_imagealignment.csv</span> for exactly this, and using
-it naively put the cells in the wrong place — its linear part implies
-<span class="mono">1.288 px/µm</span> while the OME metadata on the same TIFF says
-<span class="mono">0.2738 µm/px</span>, a factor 2.84 apart. Whichever one is
+it naively put the cells in the wrong place 鈥?its linear part implies
+<span class="mono">1.288 px/碌m</span> while the OME metadata on the same TIFF says
+<span class="mono">0.2738 碌m/px</span>, a factor 2.84 apart. Whichever one is
 believed, the translation term does not correspond.</p>
 
 <p>So the transform was fixed from independent evidence, one component at a time:</p>
 
 <div class="flow">
  <div class="step"><div class="n">ROTATION</div><div class="t">from the matrix</div>
-  <div class="d">its off-diagonal terms dominate, so it is a ~90° rotation.
-  Second-moment matching recovers −85.6° and −93.4° on the two slides — within
-  4° of the matrix's own −89.6°. Two methods agreeing on rotation.</div></div>
+  <div class="d">its off-diagonal terms dominate, so it is a ~90掳 rotation.
+  Second-moment matching recovers 鈭?5.6掳 and 鈭?3.4掳 on the two slides 鈥?within
+  4掳 of the matrix's own 鈭?9.6掳. Two methods agreeing on rotation.</div></div>
  <div class="step"><div class="n">SCALE</div><div class="t">from cell size</div>
-  <div class="d">cell_area gives a cell diameter of 11.4 µm on lc; the nuclei
-  measured in the H&amp;E at the OME pixel size are 12.1 µm. At the matrix's scale
-  they would be 34 µm, which is not a lung cell. Moment matching gives 0.271 µm/px
-  against the OME's 0.274 — 1.1% apart.</div></div>
+  <div class="d">cell_area gives a cell diameter of 11.4 碌m on lc; the nuclei
+  measured in the H&amp;E at the OME pixel size are 12.1 碌m. At the matrix's scale
+  they would be 34 碌m, which is not a lung cell. Moment matching gives 0.271 碌m/px
+  against the OME's 0.274 鈥?1.1% apart.</div></div>
  <div class="step"><div class="n">TRANSLATION</div><div class="t">from moments</div>
   <div class="d">matching the covariance ellipse of the cell cloud to the tissue
   mask. Unlike IoU or "fraction on tissue", this cannot be gamed by shrinking the
-  cloud — both of those slid to the edge of the search range before this.</div></div>
+  cloud 鈥?both of those slid to the edge of the search range before this.</div></div>
 </div>
 
 <figure><img src="figures/registration_coverage.png"
  alt="registration coverage">
  <figcaption>The check: red is the mapped cell density, cyan the tissue-mask edge.
  The wash follows the tissue outline and stays off the glass. Getting a readable
- version of this took several attempts — single-pixel dots are unresolvable at
+ version of this took several attempts 鈥?single-pixel dots are unresolvable at
  slide scale, and the first tissue mask found 30% tissue where the eye sees 60%
  because Otsu on luminance misses pale stroma.</figcaption></figure>
 
 <div class="grid">
- <div class="stat"><div class="v">{reg['5k']['rot_deg']:.1f}°</div>
-  <div class="l">5k rotation, moments (matrix: {reg['5k']['matrix_rot_deg']:.1f}°)</div></div>
+ <div class="stat"><div class="v">{reg['5k']['rot_deg']:.1f}掳</div>
+  <div class="l">5k rotation, moments (matrix: {reg['5k']['matrix_rot_deg']:.1f}掳)</div></div>
  <div class="stat"><div class="v">{reg['5k']['um_per_px']:.3f}</div>
-  <div class="l">5k µm/px, moments (OME: 0.274)</div></div>
+  <div class="l">5k 碌m/px, moments (OME: 0.274)</div></div>
  <div class="stat"><div class="v">{reg['5k']['on_tissue']*100:.0f}%</div>
   <div class="l">cells landing on tissue</div></div>
  <div class="stat"><div class="v">{m5['cells_in_frame']*100:.0f}%</div>
@@ -207,27 +225,26 @@ believed, the translation term does not correspond.</p>
 
 <h2>3. Tiles, three modalities</h2>
 <table><thead><tr><th>slide</th><th class="num">tiles kept</th>
-<th class="num">tile px</th><th class="num">µm/px</th>
-<th class="num">tile µm</th><th class="num">cells in frame</th></tr></thead>
+<th class="num">tile px</th><th class="num">碌m/px</th>
+<th class="num">tile 碌m</th><th class="num">cells in frame</th></tr></thead>
 <tbody>{sizes}</tbody></table>
-<p class="note">Tiles are 224×224 at ~1 µm/px, non-overlapping, keeping only those
-with ≥60% stained tissue and ≥10 cells. Tissue is detected by <em>colour</em>, not
+<p class="note">Tiles are 224脳224 at ~1 碌m/px, non-overlapping, keeping only those
+with 鈮?0% stained tissue and 鈮?0 cells. Tissue is detected by <em>colour</em>, not
 darkness: Otsu on luminance rejected almost every tile because a tile that is
 entirely tissue still splits its own histogram near the middle.</p>
 
 <h3>What goes into a tile's feature vector</h3>
 <div class="flow">
  <div class="step"><div class="n">IMAGE</div><div class="t">128 dims</div>
-  <div class="d">a CNN trained from scratch on the tiles with a contrastive loss —
-  HIPPO's step 1. No pretrained weights: download.pytorch.org and HuggingFace are
+  <div class="d">a CNN trained from scratch on the tiles with a contrastive loss 鈥?  HIPPO's step 1. No pretrained weights: download.pytorch.org and HuggingFace are
   both unreachable from this server, but HIPPO trains its encoder the same way, so
   this is the method rather than a substitute.</div></div>
  <div class="step"><div class="n">EXPRESSION</div><div class="t">32 dims</div>
   <div class="d">mean of the log1p(CP10k) PCA values of the cells inside the tile.
-  log1p rather than raw counts, so a 40 µm tile and a 200 µm tile are comparable.</div></div>
+  log1p rather than raw counts, so a 40 碌m tile and a 200 碌m tile are comparable.</div></div>
  <div class="step"><div class="n">ANNOTATION</div><div class="t">22 dims</div>
   <div class="d">fraction of the tile's cells in each annotated cell type, laid out
-  on the union vocabulary — the slides do not share a label set (17 on 5k, 14 on lc),
+  on the union vocabulary 鈥?the slides do not share a label set (17 on 5k, 14 on lc),
   so without a shared layout the pooled matrix is ragged.</div></div>
 </div>
 
@@ -247,25 +264,25 @@ entirely tissue still splits its own histogram near the middle.</p>
   <div class="l">fused feature dimensions</div></div>
 </div>
 
-<h3>5k — representative tiles per phenotype</h3>
+<h3>5k 鈥?representative tiles per phenotype</h3>
 {fig('fused_5k_gallery.jpg',
      'HIPPO Fig 2C, rebuilt: for each phenotype the eight tiles closest to its '
      'mean, at 224x224, Reinhard-normalised. The phenotype labels are the '
      "clustering's own.")}
 
-<h3>5k — where the units sit on the section</h3>
+<h3>5k 鈥?where the units sit on the section</h3>
 {fig('fused_5k_spatial.jpg',
      'HIPPO Fig 5B, rebuilt: every tile drawn at its grid position, coloured by '
      'phenotype, over the H&E. Squares are confined to tissue and neighbours '
      'mostly share a colour, so the phenotypes are anatomical domains rather '
      'than noise.')}
 
-<h3>5k — composition</h3>
+<h3>5k 鈥?composition</h3>
 {fig('fused_5k_heatmap.jpg',
      'HIPPO Fig 3A, rebuilt: phenotype composition per slide, and each '
      "phenotype's mean cell-type composition.")}
 
-<h3>lc — the same three panels on the second slide</h3>
+<h3>lc 鈥?the same three panels on the second slide</h3>
 {fig('fused_lc_gallery.jpg', 'lc: representative tiles per phenotype.')}
 {fig('fused_lc_spatial.jpg', 'lc: spatial map of the units.')}
 
@@ -275,28 +292,28 @@ Keeping only the image gives {ab_img['n_phenotypes']} phenotypes. Keeping only
 expression gives {ab_e['n_phenotypes']}, and expression plus annotation gives
 {ab_ea['n_phenotypes']}. Fusing all three gives {fused['n_phenotypes']}.
 <br><br>
-The count is not the result and should not be read as one — G is whatever BIC
-picks on a 64×64 correlation matrix, and that quantity moves for reasons that have
+The count is not the result and should not be read as one 鈥?G is whatever BIC
+picks on a 64脳64 correlation matrix, and that quantity moves for reasons that have
 nothing to do with biology. What the ablation is for is the gallery:
 <strong>a phenotype that survives in the image-only run and in the expression-only
 run is one both modalities agree on.</strong> Read the panels, not the row counts.
 </div>
 <p class="note">The G upper bound is capped at 15. Left uncapped the BIC keeps
 improving as components are added, since 64 points in 64 dimensions can always be
-fitted better by more Gaussians — an early run picked 30 "phenotypes" for 2,086
+fitted better by more Gaussians 鈥?an early run picked 30 "phenotypes" for 2,086
 tiles, which is curve fitting rather than structure.</p>
 
 <h2>6. The learned patterns as a 3D model</h2>
 <p>A 2D section is a slice through a three-dimensional tissue, and the slice still
 carries information about the third axis. Sectioning a sphere of radius <span
 class="mono">R</span> at distance <span class="mono">z</span> from its centre
-leaves a disc of radius <span class="mono">a = sqrt(R² − z²)</span> — so the
+leaves a disc of radius <span class="mono">a = sqrt(R虏 鈭?z虏)</span> 鈥?so the
 apparent area is not the cell's size, it is the size of the cut.
 <a href="https://doi.org/10.1002/advs.202518706">CellSqueeze3D</a> (Kong &amp; Lu,
 <em>Adv Sci</em> 2026) turns that relation into an inverse problem and solves it
 under biomechanical constraints. This section does the same on our fields, and
 renders the answer the way <a href="https://arxiv.org/abs/2101.11600">Alon
-et&nbsp;al.</a> do — as explicit spheres carrying position, radius and the learned
+et&nbsp;al.</a> do 鈥?as explicit spheres carrying position, radius and the learned
 phenotype, rather than a voxel grid, so the pattern is visible in the model.</p>
 
 <div class="callout">
@@ -312,7 +329,7 @@ arrangement consistent with the 2D observation.
 
 <p>Two honest limits came out of this, and both are in the numbers below rather
 than in a footnote. First, the group radius is capped by what the observed density
-can physically accommodate — <span class="mono">N</span> spheres of radius
+can physically accommodate 鈥?<span class="mono">N</span> spheres of radius
 <span class="mono">R</span> in area <span class="mono">A</span> and slab
 <span class="mono">2t</span> cannot exceed a packing fraction of about 0.6, and
 without the cap the solver is asked for something geometrically impossible.
@@ -327,7 +344,7 @@ figure reported is the fraction of 2D conflicts that moving cells in
 <p class="note">Drag to rotate, scroll to zoom, or step through the phenotypes one
 at a time. The cross-section toggle hides everything below
 <span class="mono">z = 0</span>, which is the slice the pathologist actually looked
-at — the cells that remain are the ones the knife cut through.</p>
+at 鈥?the cells that remain are the ones the knife cut through.</p>
 
 <h3>Volume render</h3>
 <p>The Blender route was abandoned too early the first time. The mistake was the
@@ -338,18 +355,18 @@ it is the one the Annotile project settled on:</p>
 
 <div class="flow">
  <div class="step"><div class="n">RADIUS</div><div class="t">type prior</div>
-  <div class="d">epi 8.5 µm, endo 5.5, nkt 4.5, and so on — not an inversion of
+  <div class="d">epi 8.5 碌m, endo 5.5, nkt 4.5, and so on 鈥?not an inversion of
   the apparent area. No identifiability problem, and no residual overlap to
   report as a caveat.</div></div>
  <div class="step"><div class="n">DEPTH</div><div class="t">relaxation</div>
-  <div class="d">centres start uniform in a 10 µm section, then are pushed apart
+  <div class="d">centres start uniform in a 10 碌m section, then are pushed apart
   along z until the spheres stop interpenetrating.</div></div>
- <div class="step"><div class="n">PATCH</div><div class="t">densest 40 µm</div>
-  <div class="d">widened to 80 then 120 µm if it holds fewer than 20 cells, capped
-  at 160. Each of our ten patterns lands 33–54 cells.</div></div>
- <div class="step"><div class="n">DEPTH ×4</div><div class="t">drawn, not measured</div>
-  <div class="d">z is multiplied by 4 for display only. A 10 µm section against a
-  40 µm patch is otherwise a wafer; the radii stay in micrometres.</div></div>
+ <div class="step"><div class="n">PATCH</div><div class="t">densest 40 碌m</div>
+  <div class="d">widened to 80 then 120 碌m if it holds fewer than 20 cells, capped
+  at 160. Each of our ten patterns lands 33鈥?4 cells.</div></div>
+ <div class="step"><div class="n">DEPTH 脳4</div><div class="t">drawn, not measured</div>
+  <div class="d">z is multiplied by 4 for display only. A 10 碌m section against a
+  40 碌m patch is otherwise a wafer; the radii stay in micrometres.</div></div>
 </div>
 
 <figure><img src="figures/sheet_cube.png"
@@ -368,13 +385,87 @@ it is the one the Annotile project settled on:</p>
 <div class="callout">
 <strong>What this is not.</strong> The spheres are a cell model, not a
 measurement. Their radii come from a cell-type prior, their depth from an overlap
-relaxation inside an assumed 10 µm section, and their positions from the Xenium
+relaxation inside an assumed 10 碌m section, and their positions from the Xenium
 centroids. The H&amp;E behind them is real and registered. Nothing here recovers
-the true 3D shape of these cells — a single section does not contain it, and the
+the true 3D shape of these cells 鈥?a single section does not contain it, and the
 reference figure this follows has the same limitation.</div>
 
 
-<h2>7. Step-by-step comparison with Annotile</h2>
+<h2>7. Do the patterns lie on a progression?</h2>
+<p>The obvious next question is whether these five patterns are stages of
+something. The closest published precedent is
+<a href="https://arxiv.org/abs/2601.21334">Vig, Wu &amp; Lotter</a>, who embed
+H&amp;E patches with a foundation model, run <strong>diffusion pseudotime</strong>
+(<a href="https://doi.org/10.1038/nmeth.3971">Haghverdi et al. 2016</a>) over the
+embeddings, and read the result as disease progression 鈥?describing the output as
+a "morphological movie" assembled from static snapshots. The same construction is
+used here, on the window embeddings.</p>
+
+<div class="flow">
+ <div class="step"><div class="n">GRAPH</div><div class="t">k = 100, cosine</div>
+  <div class="d">A k-NN graph over the window embeddings, with a locally scaled
+  Gaussian kernel <span class="mono">exp(鈭抎虏/2蟽岬⑾冣奔)</span> where 蟽 is the distance
+  to the k-th neighbour.</div></div>
+ <div class="step"><div class="n">DIFFUSE</div><div class="t">10 components</div>
+  <div class="d">Row-normalise to a transition matrix, accumulate over random
+  walks of all lengths, <span class="mono">M = (I 鈭?T虄)鈦宦?鈭?I</span>, from the top
+  diffusion components.</div></div>
+ <div class="step"><div class="n">ORDER</div><div class="t">distance from root</div>
+  <div class="d">Pseudotime is <span class="mono">鈥朚(root,路) 鈭?M(i,路)鈥?/span>. The
+  root is the medoid of the pattern with the most differentiated normal
+  epithelium 鈥?an assumption, not a measurement.</div></div>
+</div>
+
+<div class="callout warn">
+<strong>RegVelo cannot be used here, and neither can any velocity method.</strong>
+RegVelo couples splicing dynamics, so it needs spliced and unspliced counts.
+Xenium measures mature transcripts only: there is no intron signal, therefore no
+velocity, therefore no regulatory latent time. Nothing in this section is a
+velocity.
+<br><br>
+<strong>And there is no ordinal ground truth.</strong> The reference paper scores
+its ordering with Kendall's 蟿 against disease stages and runs a permutation test
+over all stage orderings. These patterns are tissue archetypes, not stages, so
+that test is not computable. What is reported instead is how cleanly each pattern
+occupies a band of the axis, and how often the ordering survives resampling.
+</div>
+
+<h3>What came out</h3>
+<table>
+<thead><tr><th>slide</th><th>order along the axis</th>
+<th class="num">median pseudotime</th><th>most fragile pair</th></tr></thead>
+<tbody>
+{traj_rows}
+</tbody></table>
+
+<p>Read the numbers rather than the arrows. On 5k the medians run 0.201 鈫?0.420,
+but four of the five sit between 0.246 and 0.282: the axis does not separate them,
+it stacks them. The resampling agrees 鈥?most pairs keep their relative order in
+95%+ of resamples, but P2鈥揚4 holds only 72%. <strong>The honest reading is that
+these are parallel tissue archetypes with a weak ordering, not a lineage.</strong>
+An earlier version of this analysis built a minimum spanning tree over five
+centroids and produced a tidier-looking chain; that was a weaker object, and the
+tighter picture it drew was not better evidence.</p>
+
+<h3>The movie</h3>
+<p>Each frame walks the axis and shows the 3D block of whichever pattern the axis
+is passing through, with the pattern's own cell-type composition beside it. This
+is what the reference paper calls a morphological movie: an animation of an
+ordering fitted to static snapshots, not of observed time.</p>
+
+<figure><img src="figures/5k_evolution.gif"
+ alt="evolution animation along diffusion pseudotime, 5k">
+ <figcaption>5k. Root P3, order P3 鈫?P2 鈫?P4 鈫?P0 鈫?P1. The axis bands are each
+ pattern's 10th鈥?0th pseudotime percentile, so their width is a readability choice
+ and their overlap is real.</figcaption></figure>
+
+<figure><img src="figures/lc_evolution.gif"
+ alt="evolution animation along diffusion pseudotime, lc">
+ <figcaption>lc. Root P0, order P0 鈫?P3 鈫?P1 鈫?P4 鈫?P2. Two independent donors
+ give two orders, which is itself informative: the axis reproduces a
+ root-to-far structure in both, but the middle of the order does not agree.</figcaption></figure>
+
+<h2>8. Step-by-step comparison with Annotile</h2>
 <p><a href="https://kainblue100.github.io/annotile/">Annotile</a> solves the same
 problem and, step for step, does most of it better. This table is read against its
 source, not its prose.</p>
@@ -391,23 +482,23 @@ label except <span class="mono">epi?</span>/<span class="mono">endo?</span></td>
 <td><strong>theirs.</strong> Ours let the densest patch land on a low-quality
 cell run; that is exactly what happened to P0 and P2 before the fix.</td></tr>
 
-<tr><td>window size</td><td>224 px of the H&E pyramid — 243 µm on 5k but 112 µm on
-lc</td><td>400 µm in micron space, identical on every slide</td>
+<tr><td>window size</td><td>224 px of the H&E pyramid 鈥?243 碌m on 5k but 112 碌m on
+lc</td><td>400 碌m in micron space, identical on every slide</td>
 <td><strong>theirs, decisively.</strong> A tile defined in pixels is a different
 amount of tissue on each slide, so the same pattern cannot mean the same thing in
 both. This is the most serious flaw in our chain.</td></tr>
 
-<tr><td>minimum cells</td><td>≥10 cells and ≥60% stained tissue</td>
-<td>≥30 cells</td><td>theirs; 10 is low enough to keep windows whose composition
+<tr><td>minimum cells</td><td>鈮?0 cells and 鈮?0% stained tissue</td>
+<td>鈮?0 cells</td><td>theirs; 10 is low enough to keep windows whose composition
 is mostly noise.</td></tr>
 
 <tr><td>H&amp;E registration</td><td>rotation from the matrix, scale measured from
 cell size, translation by second-moment matching</td>
-<td>the matrix as shipped, with a brightness check: if the median crop is ≥235
+<td>the matrix as shipped, with a brightness check: if the median crop is 鈮?35
 the inverse is used instead</td>
 <td><strong>theirs for effort, ours for evidence.</strong> Their check resolves
 only the direction, yet it evidently suffices. Our elaborate fit was driven by a
-real 2.84× disagreement between the matrix and the OME metadata — worth asking
+real 2.84脳 disagreement between the matrix and the OME metadata 鈥?worth asking
 whether that disagreement is real or an artefact of how we read the units.</td></tr>
 
 <tr><td>H&amp;E features</td><td>a contrastive CNN trained on the tiles, 128 dims</td>
@@ -416,7 +507,7 @@ whether that disagreement is real or an artefact of how we read the units.</td><
 seven summary statistics cannot. This is the one place our chain is stronger.</td></tr>
 
 <tr><td>stain normalisation</td><td>Reinhard, source stats per slide, target fixed</td>
-<td>none</td><td>ours, in principle — though it also means our image features are
+<td>none</td><td>ours, in principle 鈥?though it also means our image features are
 not on the same scale as theirs.</td></tr>
 
 <tr><td>expression features</td><td>32 PCs per slide, computed independently</td>
@@ -426,29 +517,29 @@ the expression block is not comparable across slides. Their shared-gene panel
 fixes that.</td></tr>
 
 <tr><td>fine clusters</td><td>k fixed at 64</td>
-<td>k ∈ {{6…20}}, chosen by silhouette with a 0.01 margin → 10</td>
+<td>k 鈭?{{6鈥?0}}, chosen by silhouette with a 0.01 margin 鈫?10</td>
 <td><strong>theirs.</strong> 64 was HIPPO's number on 227k tiles; on 2,086 it is
 arbitrary and the silhouette says so.</td></tr>
 
-<tr><td>merge to patterns</td><td>Pearson correlation of centroids → GMM on the
-correlation matrix, G ≤ 15</td>
-<td>standardised fine-cluster mean vectors → diagonal GMM on those vectors,
-G ≤ 8; the correlation matrix is <em>not</em> used as input</td>
+<tr><td>merge to patterns</td><td>Pearson correlation of centroids 鈫?GMM on the
+correlation matrix, G 鈮?15</td>
+<td>standardised fine-cluster mean vectors 鈫?diagonal GMM on those vectors,
+G 鈮?8; the correlation matrix is <em>not</em> used as input</td>
 <td><strong>theirs, and it is a correction to HIPPO itself.</strong> A
 correlation matrix has as many rows as columns and a full covariance is
-unstable — Annotile says so explicitly. We followed the paper literally.</td></tr>
+unstable 鈥?Annotile says so explicitly. We followed the paper literally.</td></tr>
 
-<tr><td>pattern naming</td><td>cluster index</td><td>ranked by cell count, P1…P8</td>
+<tr><td>pattern naming</td><td>cluster index</td><td>ranked by cell count, P1鈥8</td>
 <td>theirs; ours makes the labels meaningless across runs.</td></tr>
 
 <tr><td>spatial coherence</td><td>judged by eye from the map</td>
-<td><span class="mono">_neighbor_agreement</span> — fraction of adjacent windows
+<td><span class="mono">_neighbor_agreement</span> 鈥?fraction of adjacent windows
 sharing a pattern, 83.6%</td>
 <td><strong>theirs.</strong> We asserted autocorrelation; they measured it.</td></tr>
 
 <tr><td>3D model</td><td>radius inverted from the segmented 2D area, z by
 optimisation under non-overlap</td>
-<td>radius from a cell-type prior, z by relaxation in a 10 µm section</td>
+<td>radius from a cell-type prior, z by relaxation in a 10 碌m section</td>
 <td><strong>theirs.</strong> Inverting one apparent area for two unknowns needed
 an identifiability argument and still left residual overlap to report.</td></tr>
 
@@ -471,7 +562,7 @@ way Annotile's can, which undercuts its main claim. If the goal is the result
 rather than the exercise, Annotile is the implementation to use.
 </div>
 
-<h2>8. What this does not show</h2>
+<h2>9. What this does not show</h2>
 <div class="callout warn">
 <ul style="margin:0;padding-left:20px">
 <li><strong>Two slides.</strong> 2,086 tiles from 5k and lc. HIPPO used 227,000
@@ -491,7 +582,7 @@ differences the clustering is supposed to see.</li>
 </ul>
 </div>
 
-<h2>9. Reproducing</h2>
+<h2>10. Reproducing</h2>
 <pre>python tools/fetch_10x_all.py            # matrices + coordinates + H&amp;E
 python tools/register_final.py          # rotation, scale, translation
 python tools/extract_tiles.py --tag 5k  # HIPPO-style tiling + three modalities
@@ -503,7 +594,7 @@ python tools/make_figures.py --name fused --tags 5k lc
 python tools/build_3d.py --tag 5k --block 1 --slab-um 6   # 2D -> 3D</pre>
 
 <footer>
- cellhippo — an independent reimplementation of the HIPPO chain for annotated cell
+ cellhippo 鈥?an independent reimplementation of the HIPPO chain for annotated cell
  tables with an image modality. Not affiliated with the HIPPO authors; the method
  and the imaging conventions are theirs (see HIPOS and GHIST+). The 3D inference
  follows CellSqueeze3D's sectioning relation and Alon et al.'s primitive-based

@@ -245,13 +245,13 @@ def glass_box(span: float, height: float, pad: float) -> None:
     wire = bpy.context.active_object
     wire.scale = (size.x, size.y, size.z)
     modifier = wire.modifiers.new("wire", "WIREFRAME")
-    # 0.0016 / emission 0.35 straight from the reference; my 0.004 / 0.9 made the
-    # cage compete with the subject
-    modifier.thickness = 0.0016
+    # emission 0.35 at thickness 0.0016 vanished against this plate; 0.6 at
+    # 0.0022 keeps the cage readable without competing with the subject
+    modifier.thickness = 0.0022
     modifier.use_replace = True
-    edge = principled("edge", (0.55, 0.32, 0.62), roughness=0.28,
+    edge = principled("edge", (0.46, 0.22, 0.54), roughness=0.28,
                       transmission=0.05, subsurface=0.0, scale=0.0, ior=1.4,
-                      coat=0.2, emission=0.35)
+                      coat=0.2, emission=0.6)
     wire.data.materials.append(edge)
     wire.visible_shadow = False
 
@@ -300,11 +300,11 @@ def overview(model: dict, zscale: float, samples: int, resolution: int) -> None:
     cells = model["cells"]
     for index, cell in enumerate(cells):
         rng = random.Random(index + 3)
-        # Annotile's parameters, unchanged.  Three rounds of "improving" them
-        # (transmission 0.08 -> 0.44 -> 0.74 -> 0.86, roughness up, coat down)
-        # each moved the result further from the reference: the translucency in
-        # that render comes from subsurface plus the coat sheen under a bright
-        # environment, not from transmission.
+        # Annotile ships transmission 0.08 here, and copying that number faithfully
+        # still produced opaque-looking bodies in this scene -- so the value is not
+        # what carried the translucency there.  These values make the see-through
+        # explicit (transmission), keep the waxy interior (subsurface), and keep a
+        # thin bright shell (coat) rather than a thick specular layer.
         base = grape(cell["color"], 0.62)
         hue = rng.uniform(-0.10, 0.10)
         val = rng.uniform(0.92, 1.06)
@@ -312,9 +312,9 @@ def overview(model: dict, zscale: float, samples: int, resolution: int) -> None:
                  min(1.0, max(0.0, base[1] * val + hue * 0.35)),
                  min(1.0, max(0.0, base[2] * val - hue * 0.5)))
         radius = float(cell["r"])
-        material = principled(f"body_{index}", color, roughness=0.2,
-                              transmission=0.08, subsurface=0.45,
-                              scale=radius * 0.35, ior=1.4, coat=0.7)
+        material = principled(f"body_{index}", color, roughness=0.30,
+                              transmission=0.62, subsurface=0.30,
+                              scale=radius * 0.28, ior=1.36, coat=0.50)
         location = Vector((float(cell["x"]), float(cell["y"]),
                            float(cell["z"]) * zscale))
         wobble = tuple(rng.uniform(0.94, 1.06) for _ in range(3))
@@ -411,8 +411,8 @@ def main() -> None:
         patterns = [item for item in patterns
                     if f"{item['pattern']}_{item['slice']}" == which
                     or item["pattern"] == which]
-    samples = 28 if mode == "preview" else 48
-    resolution = 640 if mode == "preview" else 800
+    samples = 28 if mode == "preview" else 160
+    resolution = 640 if mode == "preview" else 1400
     for model in patterns:
         stem = f"{model['pattern']}_{model['slice']}"
         if view in ("both", "cube"):
