@@ -121,6 +121,10 @@ def draw_slide(tag, grid, pairs, edges, outdir, max_px=1800):
                     width=lw)
 
     p_out = os.path.join(outdir, f"{tag}_transitions.png")
+    # the slides are long thin strips, so portrait output fills a page column as
+    # a 1000 x 1800 ribbon; rotate to landscape
+    if im.height > im.width:
+        im = im.rotate(90, expand=True)
     im.save(p_out)
 
     # measure rather than assume: the lines must be present this time

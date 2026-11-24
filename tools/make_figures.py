@@ -84,7 +84,15 @@ def spatial(tile_img_shape, pheno, meta, tile_px, path, bg=None):
     else:
         base = Image.fromarray(bg).convert("RGB")
         W, H = base.size
-    scale = 1400 / max(W, H)
+    # Scale so the SHORT side reaches the target, not the long side.  The slides
+    # are long thin strips -- luad is 5790 x 22544 at level 1 -- so normalising
+    # the long side gave a 359 px wide image that fills the page column as a
+    # 1000 x 3900 ribbon.  Rotating a portrait result to landscape makes the map
+    # readable at any width: luad becomes 1500 x 385 instead.
+    target = 1500
+    scale = min(1.0, target / min(W, H))
+    if max(W, H) * scale > 2.4 * target:
+        scale = 2.4 * target / max(W, H)
     ow, oh = int(W * scale), int(H * scale)
     base = base.resize((ow, oh), Image.LANCZOS)
     ov = Image.new("RGBA", (ow, oh), (0, 0, 0, 0))
@@ -97,8 +105,10 @@ def spatial(tile_img_shape, pheno, meta, tile_px, path, bg=None):
         dr.rectangle([x0, y0, x0 + step, y0 + step],
                      fill=col + (140,), outline=col + (220,))
     out = Image.alpha_composite(base.convert("RGBA"), ov).convert("RGB")
+    if out.height > out.width:
+        out = out.rotate(90, expand=True)
     out.save(path, quality=93)
-    return out.size, ow, oh
+    return out.size, out.width, out.height
 
 
 def heatmap(profiles, slides, G, ann, ann_frac, path):

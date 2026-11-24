@@ -99,9 +99,30 @@ sizes = "".join(
     for tag, m in (("5k", m5), ("lc", ml), ("luad", mld)))
 
 
-def fig(src, cap):
-    return (f'<figure><img src="figures/{src}" alt="{cap}">'
+def fig(src, cap, cls=""):
+    c = f' class="{cls}"' if cls else ""
+    return (f'<figure{c}><img src="figures/{src}" alt="{cap}">'
             f'<figcaption>{cap}</figcaption></figure>')
+
+
+MIG = {}
+_p = os.path.join(DOCS, "migration.json")
+if os.path.exists(_p):
+    MIG = json.load(open(_p, encoding="utf-8")).get("slides", {})
+
+mig_rows = ""
+for _tag in ("5k", "lc", "luad"):
+    s = MIG.get(_tag)
+    if not s:
+        continue
+    _par = s["parent"]
+    _edges = " → ".join(f"P{k}" for k in s["video_branch"])
+    _shared = [e for e in
+               (f"P{k}→P{v}" for k, v in _par.items() if v is not None)]
+    mig_rows += ('<tr><td class="mono">' + _tag + "</td>"
+                 + f'<td>P{s["root"]}</td>'
+                 + f'<td>{_edges}</td>'
+                 + f'<td class="num">{len(s["arrows"])}</td></tr>')
 
 
 def html():
@@ -155,6 +176,12 @@ def html():
  figure {{ margin:20px 0; background:var(--card); border:1px solid var(--line);
    border-radius:10px; padding:12px }}
  figure img {{ width:100%; height:auto; display:block; border-radius:6px }}
+ /* Slide maps: cap the HEIGHT rather than the width.  The sections are long
+    strips of very different aspect (luad is 3.9:1, 5k 1.6:1), so a fixed width
+    makes the wide ones unreadably short and the narrow ones far too tall.  A
+    height ceiling gives every map the same visual weight. */
+ figure.map img {{ max-height:340px; max-width:100%; width:auto; margin:0 auto }}
+ figure.map figcaption {{ max-width:640px; margin-left:auto; margin-right:auto }}
  figcaption {{ font-size:13px; color:var(--muted); margin-top:9px;
    line-height:1.65 }}
  .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
@@ -297,7 +324,7 @@ def html():
 {fig('fused_5k_spatial.jpg',
      '复刻 HIPPO 图 5B：每个瓦片按网格位置绘制，颜色表示表型，叠在 H&E 上。'
      '方块只出现在组织范围内，且相邻方块大多同色，说明这些表型是解剖学上的区域，'
-     '而不是噪声。')}
+     '而不是噪声。长条形切片已旋转为横向显示。', cls='map')}
 
 <h3>5k —— 组成</h3>
 {fig('fused_5k_heatmap.jpg',
@@ -305,12 +332,12 @@ def html():
 
 <h3>lc —— 第二张切片上的同样三张图</h3>
 {fig('fused_lc_gallery.jpg', 'lc：每个表型的代表性瓦片。')}
-{fig('fused_lc_spatial.jpg', 'lc：各单元的空间分布。')}
+{fig('fused_lc_spatial.jpg', 'lc：各单元的空间分布。', cls='map')}
 {fig('fused_lc_heatmap.jpg', 'lc：表型组成与每个表型的细胞类型均值。')}
 
 <h3>luad —— 第三个样本</h3>
 {fig('fused_luad_gallery.jpg', 'luad：每个表型的代表性瓦片。')}
-{fig('fused_luad_spatial.jpg', 'luad：各单元的空间分布。')}
+{fig('fused_luad_spatial.jpg', 'luad：各单元的空间分布。', cls='map')}
 {fig('fused_luad_heatmap.jpg', 'luad：表型组成与每个表型的细胞类型均值。')}
 
 <p class="note">第三个样本不是前两个的复制。luad 的 H&amp;E 是一张 45087×11580
@@ -461,15 +488,15 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
 {trans_rows}
 </tbody></table>
 
-<figure><img src="figures/5k_transitions.png"
+<figure class="map"><img src="figures/5k_transitions.png"
  alt="5k 模式图与交接边界">
  <figcaption>5k。窗口按模式着色；黑线标出每一处相邻两窗口模式不同的边界。</figcaption></figure>
 
-<figure><img src="figures/lc_transitions.png"
+<figure class="map"><img src="figures/lc_transitions.png"
  alt="lc 模式图与交接边界">
  <figcaption>lc。971 次交接，是三个样本里镶嵌最交错的。</figcaption></figure>
 
-<figure><img src="figures/luad_transitions.png"
+<figure class="map"><img src="figures/luad_transitions.png"
  alt="luad 模式图与交接边界">
  <figcaption>luad。587 次交接。</figcaption></figure>
 
@@ -490,6 +517,53 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
 的细胞类型。它们指向同一个模式，这比任何单项都更有说服力。<br><br>
 <strong>但要注意反面：</strong>起点的模式、其余三者的相对次序、以及所有中位数的
 具体数值，在三个样本之间都不一致。能被支持的只有 P3 这一个位置，不是一整条谱系。
+</div>
+
+<h3>模式之间的迁移方向</h3>
+<p>上一节数出了哪些模式相接，但邻接本身没有方向。要给出方向，需要三条规则，
+和 Annotile 的做法一致：</p>
+
+<div class="flow">
+ <div class="step"><div class="n">连边</div><div class="t">只在真正相接处</div>
+  <div class="d">两个模式必须共享至少 3 个相邻窗口才允许有一条边。这直接取自
+  上一节的交接计数，所以不会在两个从未接触的模式之间凭空造出关系。</div></div>
+ <div class="step"><div class="n">定向</div><div class="t">沿伪时序向上</div>
+  <div class="d">边从伪时间中位数小的模式指向大的。</div></div>
+ <div class="step"><div class="n">选父节点</div><div class="t">特征距离最短</div>
+  <div class="d">一个模式的多个上游接触里，挂到特征距离最近的那一个。
+  邻接说明谁和谁相接，特征距离说明这一接触朝哪边走。</div></div>
+</div>
+
+<table>
+<thead><tr><th>样本</th><th>根</th><th>动画走的那一支</th>
+<th class="num">有向边数</th></tr></thead>
+<tbody>
+{mig_rows}
+</tbody></table>
+
+<figure class="map"><img src="figures/migration/5k_migration.png"
+ alt="5k 切片上的模式迁移方向">
+ <figcaption>5k。窗口按模式着色，白箭头从上游模式的重心指向下游；
+ 较粗的箭头是动画走的那一支。图例在同一张图上。</figcaption></figure>
+
+<figure class="map"><img src="figures/migration/lc_migration.png"
+ alt="lc 切片上的模式迁移方向">
+ <figcaption>lc。</figcaption></figure>
+
+<figure class="map"><img src="figures/migration/luad_migration.png"
+ alt="luad 切片上的模式迁移方向">
+ <figcaption>luad。</figcaption></figure>
+
+<div class="callout">
+<strong>三个样本都出现的唯一一条有向边是 P0 → P3。</strong>
+它在 5k（特征距离 6.04）、lc（5.19）和 luad（5.98）上都成立，而且三次都是
+该模式到上游的最短特征距离。这与「P3 是界面模式」是同一件事的两种说法：
+P3 既和所有其他模式相接最多，也是它们下游最近的落点。<br><br>
+<strong>不要把它读成谱系。</strong>每张切片来自不同供体，伪时序是在单张切片上
+拟合出来的，细胞从未从一个窗口被追踪到下一个窗口。这里成立的是「在这张切片上，
+P0 的区域与 P3 的区域相接、且 P0 的特征更靠近上游」——一个关于这张切片的方向性
+描述，而不是一个病人体内发生过的过程。三张切片的根部模式也各不相同
+（P2 / P0 / P1），这本身就说明起点不稳定。
 </div>
 
 <h3>演化动画</h3>
