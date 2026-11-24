@@ -44,8 +44,16 @@ def pattern_block(tag, name):
     ph = pheno[off:off + int((slides == tag).sum())]
 
     z = np.load(os.path.join(WORK, f"{tag}_tiles.npz"))
-    blocks = [zscore(z["ann"].astype(np.float64)),
-              zscore(z["expr"].astype(np.float64))]
+    # lay the annotation block out over the pooled vocabulary, as cluster_tiles
+    # does -- otherwise each slide's UMAP is built on its own label axes and the
+    # caption's claim that both projections use the identical feature block is
+    # false
+    vocab = [str(v) for v in res["annotations"]]
+    idx = {v: i for i, v in enumerate(vocab)}
+    A = np.zeros((len(z["ann"]), len(vocab)), dtype=np.float64)
+    for j, lab in enumerate(z["annotations"]):
+        A[:, idx[str(lab)]] = z["ann"][:, j]
+    blocks = [zscore(A), zscore(z["expr"].astype(np.float64))]
     emb = os.path.join(WORK, f"{tag}_cnn.npz")
     if os.path.exists(emb):
         blocks.append(zscore(np.load(emb)["emb"].astype(np.float64)))

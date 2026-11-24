@@ -28,7 +28,7 @@ def main():
     ap.add_argument("--dir", default=r"D:\coda_matlab\cellhippo\figures\volume\blender")
     ap.add_argument("--out", default=r"D:\coda_matlab\cellhippo\figures\volume\sheet_cube.png")
     ap.add_argument("--view", default="cube", choices=["cube", "close"])
-    ap.add_argument("--cols", type=int, default=5)
+    ap.add_argument("--cols", type=int, default=4)
     ap.add_argument("--cell", type=int, default=420)
     a = ap.parse_args()
 

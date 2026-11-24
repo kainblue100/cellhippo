@@ -67,13 +67,24 @@ def pattern_block(tag, name):
     ph = pheno[off:off + int((slides == tag).sum())]
 
     z = np.load(os.path.join(WORK, f"{tag}_tiles.npz"))
-    blocks = [zscore(z["ann"].astype(np.float64)),
+    # The annotation block must be laid out over the *union* vocabulary before
+    # anything indexes it by label.  z["ann"] is this slide's own label set (17
+    # columns on 5k) while res["annotations"] is the pooled vocabulary (23 once
+    # luad joined), so returning the two together mixes two index spaces: looking
+    # up AT2_like gave index 21 against a 17-column array.  With two slides the
+    # two happened to be compatible; the third broke it.
+    vocab = [str(v) for v in res["annotations"]]
+    idx = {v: i for i, v in enumerate(vocab)}
+    ann = np.zeros((len(z["ann"]), len(vocab)), dtype=np.float64)
+    for j, lab in enumerate(z["annotations"]):
+        ann[:, idx[str(lab)]] = z["ann"][:, j]
+    blocks = [zscore(ann),
               zscore(z["expr"].astype(np.float64))]
     emb_path = os.path.join(WORK, f"{tag}_cnn.npz")
     if os.path.exists(emb_path):
         blocks.append(zscore(np.load(emb_path)["emb"].astype(np.float64)))
     X = np.hstack(blocks)
-    return X, ph, z["ann"], list(res["annotations"])
+    return X, ph, ann, vocab
 
 
 def diffusion_pseudotime(X, root_idx, k=100, n_dc=10):

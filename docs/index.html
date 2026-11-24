@@ -68,7 +68,9 @@
  <h1>cellhippo</h1>
  <p>把 HIPPO 的表型发现链路同时跑在三种模态上：H&amp;E 图像本身、Xenium 表达
  矩阵，以及原文没有的细胞类型注释。分析单元是组织瓦片（tile），与 HIPPO
- 一致 —— 所以输出是一份可以看的表型图谱，外加每个单元在切片上位置的分布图。</p>
+ 一致 —— 所以输出是一份可以看的表型图谱，外加每个单元在切片上位置的分布图。
+ 三个独立的肺癌样本：<span class="mono">5k</span>、<span class="mono">lc</span>、
+ <span class="mono">luad</span>，共 3,040 个瓦片。</p>
 </div></header>
 <div class="wrap">
 
@@ -101,9 +103,9 @@
 
 <div class="flow">
  <div class="step"><div class="n">旋转</div><div class="t">取自矩阵</div>
-  <div class="d">非对角项占主导，说明是约 90° 的旋转。二阶矩匹配在两张切片上
-  分别得到 −85.6° 和 −93.4°，与矩阵自身的 −89.6° 相差 4° 以内。两种方法
-  在旋转上互相印证。</div></div>
+  <div class="d">非对角项占主导，说明是约 90° 的旋转。二阶矩匹配在三个样本上
+  分别得到 −85.6°、−93.4° 和 −91.0°，与各自矩阵自身的 −89.6°、−90.0°、
+  −89.8° 相差最大 4°。两种方法在旋转上互相印证。</div></div>
  <div class="step"><div class="n">尺度</div><div class="t">取自细胞尺寸</div>
   <div class="d">cell_area 给出 lc 的细胞直径 11.4 µm；在 OME 像素尺寸下从
   H&amp;E 量出的细胞核是 12.1 µm。若按矩阵的尺度则是 34 µm，那不是肺细胞。
@@ -136,11 +138,15 @@
 <table><thead><tr><th>切片</th><th class="num">保留瓦片</th>
 <th class="num">瓦片像素</th><th class="num">µm/px</th>
 <th class="num">瓦片边长 µm</th><th class="num">画面内细胞</th></tr></thead>
-<tbody><tr><td class="mono">5k</td><td class="num">722</td><td class="num">224</td><td class="num">1.08</td><td class="num">243</td><td class="num">96.8%</td></tr><tr><td class="mono">lc</td><td class="num">1,364</td><td class="num">224</td><td class="num">0.50</td><td class="num">112</td><td class="num">94.5%</td></tr></tbody></table>
+<tbody><tr><td class="mono">5k</td><td class="num">722</td><td class="num">224</td><td class="num">1.08</td><td class="num">243</td><td class="num">96.8%</td></tr><tr><td class="mono">lc</td><td class="num">1,364</td><td class="num">224</td><td class="num">0.50</td><td class="num">112</td><td class="num">94.5%</td></tr><tr><td class="mono">luad</td><td class="num">954</td><td class="num">224</td><td class="num">0.46</td><td class="num">104</td><td class="num">93.2%</td></tr></tbody></table>
 <p class="note">瓦片为 224×224、约 1 µm/px、不重叠，只保留染色组织占
 ≥ 30% 且细胞数 ≥ 10 的瓦片。组织是按<em>颜色</em>而不是按暗度检测的：
 亮度上的 Otsu 会否掉几乎所有瓦片，因为一个整块都是组织的瓦片，它自己的直方图
-仍然会在中间附近分裂。</p>
+仍然会在中间附近分裂。<br>
+<strong>这里有一个必须说明的缺陷：</strong>瓦片定义在像素上，于是同一个
+224 px 在三个样本上分别是 243 µm、112 µm 和 104 µm —— 相差 2.3 倍。不同切片
+上的同一个表型因此不代表同样多的组织。这是本流程最严重的一个问题，
+第 8 节会再回到它。</p>
 
 <h3>一个瓦片的特征向量由什么组成</h3>
 <div class="flow">
@@ -151,26 +157,28 @@
  <div class="step"><div class="n">表达</div><div class="t">32 维</div>
   <div class="d">瓦片内细胞的 log1p(CP10k) 主成分均值。用 log1p 而不是原始计数，
   这样 40 µm 的瓦片和 200 µm 的瓦片才可比。</div></div>
- <div class="step"><div class="n">注释</div><div class="t">22 维</div>
-  <div class="d">瓦片内细胞属于各注释细胞类型的比例，按并集词表排布 —— 两张切片
-  的标签集并不相同（5k 有 17 种，lc 有 14 种），没有统一排布的话合并矩阵会参差
-  不齐。</div></div>
+ <div class="step"><div class="n">注释</div><div class="t">23 维</div>
+  <div class="d">瓦片内细胞属于各注释细胞类型的比例，按并集词表排布 —— 三个样本
+  的标签集并不相同（5k 有 17 种，lc 有 14 种，luad 有 10 种），没有统一排布的话
+  合并矩阵会参差不齐。</div></div>
 </div>
 
 <h2>4. 结果</h2>
 <table><thead><tr><th>模态组合</th><th class="num">特征维度</th>
 <th class="num">瓦片数</th><th class="num">细簇数</th>
-<th class="num">表型数</th></tr></thead><tbody><tr><td>图像 + 表达 + 注释</td><td class="num">182</td><td class="num">2086</td><td class="num">64</td><td class="num"><strong>5</strong></td></tr><tr><td>仅图像</td><td class="num">128</td><td class="num">2086</td><td class="num">64</td><td class="num"><strong>4</strong></td></tr><tr><td>表达 + 注释</td><td class="num">54</td><td class="num">2086</td><td class="num">64</td><td class="num"><strong>8</strong></td></tr><tr><td>仅表达</td><td class="num">32</td><td class="num">2086</td><td class="num">64</td><td class="num"><strong>8</strong></td></tr></tbody></table>
+<th class="num">表型数</th></tr></thead><tbody><tr><td>图像 + 表达 + 注释</td><td class="num">183</td><td class="num">3040</td><td class="num">64</td><td class="num"><strong>4</strong></td></tr><tr><td>仅图像</td><td class="num">128</td><td class="num">3040</td><td class="num">64</td><td class="num"><strong>3</strong></td></tr><tr><td>表达 + 注释</td><td class="num">55</td><td class="num">3040</td><td class="num">64</td><td class="num"><strong>3</strong></td></tr><tr><td>仅表达</td><td class="num">32</td><td class="num">3040</td><td class="num">64</td><td class="num"><strong>3</strong></td></tr></tbody></table>
 
 <div class="grid">
- <div class="stat"><div class="v">2,086</div>
+ <div class="stat"><div class="v">3,040</div>
   <div class="l">参与聚类的瓦片</div></div>
  <div class="stat"><div class="v">64</div>
   <div class="l">细簇数（HIPPO 的取值）</div></div>
- <div class="stat"><div class="v">5</div>
+ <div class="stat"><div class="v">4</div>
   <div class="l">GMM/BIC 合并后的表型数</div></div>
- <div class="stat"><div class="v">182</div>
+ <div class="stat"><div class="v">183</div>
   <div class="l">融合后的特征维度</div></div>
+ <div class="stat"><div class="v">3</div>
+  <div class="l">独立样本（5k / lc / luad）</div></div>
 </div>
 
 <h3>5k —— 每个表型的代表性瓦片</h3>
@@ -185,12 +193,24 @@
 <h3>lc —— 第二张切片上的同样三张图</h3>
 <figure><img src="figures/fused_lc_gallery.jpg" alt="lc：每个表型的代表性瓦片。"><figcaption>lc：每个表型的代表性瓦片。</figcaption></figure>
 <figure><img src="figures/fused_lc_spatial.jpg" alt="lc：各单元的空间分布。"><figcaption>lc：各单元的空间分布。</figcaption></figure>
+<figure><img src="figures/fused_lc_heatmap.jpg" alt="lc：表型组成与每个表型的细胞类型均值。"><figcaption>lc：表型组成与每个表型的细胞类型均值。</figcaption></figure>
+
+<h3>luad —— 第三个样本</h3>
+<figure><img src="figures/fused_luad_gallery.jpg" alt="luad：每个表型的代表性瓦片。"><figcaption>luad：每个表型的代表性瓦片。</figcaption></figure>
+<figure><img src="figures/fused_luad_spatial.jpg" alt="luad：各单元的空间分布。"><figcaption>luad：各单元的空间分布。</figcaption></figure>
+<figure><img src="figures/fused_luad_heatmap.jpg" alt="luad：表型组成与每个表型的细胞类型均值。"><figcaption>luad：表型组成与每个表型的细胞类型均值。</figcaption></figure>
+
+<p class="note">第三个样本不是前两个的复制。luad 的 H&amp;E 是一张 45087×11580
+的窄长切片，组织掩膜只占 50.8%（前两张是 66.7% 和 70.4%），它的注释词表也只有
+10 种细胞类型（5k 有 17 种，lc 有 14 种）。把它放进联合聚类之后，注释并集从
+22 个标签涨到 23 个，而表型数从 5 变成 4 —— 加入一个样本改变了全部三个样本的
+划分，这正是联合聚类的应有之义，也是不能把两片的结果当作最终结果的原因。</p>
 
 <h2>5. 消融实验说明了什么</h2>
 <div class="callout">
-只用图像得到 4 个表型。只用表达得到 8
-个，表达加注释得到 8 个。三者融合得到
-5 个。
+只用图像得到 3 个表型。只用表达得到 3
+个，表达加注释得到 3 个。三者融合得到
+4 个。
 <br><br>
 这个计数本身不是结论，也不该被当成结论 —— G 就是 BIC 在 64×64 相关矩阵上挑出
 来的值，而这个量会因为与生物学无关的原因变动。消融真正要看的是画廊：
@@ -198,8 +218,8 @@
 都认可的表型。</strong>看面板，不要看行数。
 </div>
 <p class="note">G 的上界被限制在 15。不设上限时 BIC 会随着分量增加一直变好，
-因为 64 个点在 64 维空间里总能用更多高斯拟合得更好 —— 早期一次运行在 2,086 个
-瓦片上挑出了 30 个「表型」，那是曲线拟合，不是结构。</p>
+因为 64 个点在 64 维空间里总能用更多高斯拟合得更好 —— 只用两个样本时，一次
+早期运行在两千多个瓦片上挑出了 30 个「表型」，那是曲线拟合，不是结构。</p>
 
 <h2>6. 把学到的模式做成 3D 模型</h2>
 <p>每个模式表示为一堆细胞：它来自的那块组织，每个细胞画出细胞膜、细胞质和
@@ -222,8 +242,8 @@
   <div class="d">细胞中心先在 10 µm 的切片内均匀分布，然后沿 z 互相推开，直到
   球体不再互相穿透。</div></div>
  <div class="step"><div class="n">组织块</div><div class="t">最密处 40 µm</div>
-  <div class="d">若少于 20 个细胞则扩大到 80 再到 120 µm，上限 160。我们的十个
-  模式各落在 33–54 个细胞。</div></div>
+  <div class="d">若少于 20 个细胞则扩大到 80 再到 120 µm，上限 160。我们的十二
+  个模式各落在 24–58 个细胞。</div></div>
  <div class="step"><div class="n">深度 ×4</div><div class="t">仅供显示</div>
   <div class="d">z 仅为了显示乘以 4。10 µm 的切片配 40 µm 的组织块否则就是一片
   薄脆饼；半径仍保持微米单位不变。</div></div>
@@ -233,7 +253,8 @@
  alt="每个模式的 Blender 玻璃方块渲染">
  <figcaption>每个模式作为一个玻璃方块放在各自的 H&amp;E 上。Blender Cycles、
  42 mm 镜头 f/5.6、每细胞含细胞膜 + 细胞质 + 细胞核，底板合成在焦平面之后，
- 因此会被相机自身的散焦柔化。上排 5k，下排 lc。</figcaption></figure>
+ 因此会被相机自身的散焦柔化。十二个模式按四列排开，每行一个样本：第一行 5k，
+ 第二行 lc，第三行 luad。</figcaption></figure>
 
 <figure><img src="figures/sheet_close.png"
  alt="每个模式中一个细胞的近景">
@@ -248,7 +269,7 @@ H&amp;E 是真实且配准过的。这里没有任何东西恢复了这些细胞
 
 
 <h2>7. 这些模式构成一个进展序列吗？</h2>
-<p>下一个显而易见的问题是：这五个模式是否是同一过程的先后阶段。最接近的已发表
+<p>下一个显而易见的问题是：这四个模式是否是同一过程的先后阶段。最接近的已发表
 先例是 <a href="https://arxiv.org/abs/2601.21334">Vig、Wu 与 Lotter</a>，他们用
 基础模型嵌入 H&amp;E 图像块，在嵌入上跑<strong>扩散伪时序</strong>
 （<a href="https://doi.org/10.1038/nmeth.3971">Haghverdi 等 2016</a>），并把结果
@@ -281,24 +302,24 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
 
 <h3>结果</h3>
 <table>
-<thead><tr><th>切片</th><th>沿轴的顺序</th>
-<th class="num">伪时序中位数范围</th><th>最脆弱的一对</th></tr></thead>
+<thead><tr><th>样本</th><th>沿轴的顺序</th>
+<th class="num">P3 的位置</th><th>最脆弱的一对</th></tr></thead>
 <tbody>
-<tr><td class="mono">5k</td><td>P3 → P2 → P4 → P0 → P1</td><td class="num">0.201 – 0.420</td><td>P0–P2（60% 的重复抽样中保持次序）</td></tr><tr><td class="mono">lc</td><td>P0 → P3 → P1 → P4 → P2</td><td class="num">0.118 – 0.269</td><td>P0–P2（10% 的重复抽样中保持次序）</td></tr>
+<tr><td class="mono">5k</td><td>P2 → P0 → P3 → P1</td><td class="num">P3 第 3 位</td><td>P0–P2（21%）</td></tr><tr><td class="mono">lc</td><td>P0 → P2 → P3 → P1</td><td class="num">P3 第 3 位</td><td>P0–P3（25%）</td></tr><tr><td class="mono">luad</td><td>P1 → P0 → P3 → P2</td><td class="num">P3 第 3 位</td><td>P0–P2（55%）</td></tr>
 </tbody></table>
 
-<p>要看数字，不要看箭头。5k 的中位数跨度是 0.201 → 0.420，但五个里有四个落在
-0.246 到 0.282 之间：这条轴没有把它们分开，只是把它们叠在一起。重复抽样也印证
-了这一点 —— 大多数配对在 95% 以上的重采样中保持相对次序，但 P2–P4 只有 72%。
-<strong>诚实的读法是：这些是彼此平行的组织原型，只带有很弱的排序，不是一个
-谱系。</strong>早期版本的分析在五个中心点上建了一棵最小生成树，画出一条看起来
-更整齐的链条；那是一个更弱的对象，它画出的更紧凑的图并不构成更好的证据。</p>
+<p>要看数字，不要看箭头。三个独立样本给出三种顺序 ——
+5k 是 P2 → P0 → P3 → P1，lc 是 P0 → P2 → P3 → P1，luad 是 P1 → P0 → P3 → P2 ——
+起点的模式各不相同，这意味着根的选择本身就不稳定，不该被过度解读。</p>
+
+<p>但有一个位置在三个样本上完全一致：<strong>P3 在每一张切片上都排在第 3 位
+（共 4 个）</strong>。结合下一节的交接统计，这是本分析能拿出的最强结论。</p>
 
 <h3>两个维度而不是一个</h3>
 <p>伪时序轴是一个一维摘要，而在这些数据上它是把模式叠起来，不是分开。对同一套
 融合特征做 UMAP 和 t-SNE 回答的是另一个问题：这些模式是彼此分离的孤岛，还是一条
-连续的流形？两种投影用的是完全相同的特征块，所以一个模式在这里的位置和它在轴上
-的位置描述的是同一个对象。</p>
+连续的流形？三个样本用的是完全相同的 183 维特征块（注释块按并集词表铺开），
+所以一个模式在这里的位置和它在轴上的位置描述的是同一个对象。</p>
 
 <figure><img src="figures/5k_embedding.png"
  alt="5k 窗口嵌入的 UMAP 与 t-SNE，按模式着色">
@@ -310,16 +331,21 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
  alt="lc 窗口嵌入的 UMAP 与 t-SNE，按模式着色">
  <figcaption>lc。同样处理，1,364 个窗口。</figcaption></figure>
 
+<figure><img src="figures/luad_embedding.png"
+ alt="luad 窗口嵌入的 UMAP 与 t-SNE，按模式着色">
+ <figcaption>luad。第三个样本，954 个窗口。</figcaption></figure>
+
 <h3>模式在切片上交接的位置</h3>
 <p>一张模式图说的是哪个模式在哪里；它没有说哪些模式相接。那是一个独立且可以直接
 计数的对象 —— 每一对相邻、且被分到不同模式的窗口就构成一次交接 —— 它不需要
 嵌入、不需要伪时序、也不需要模型。把它们数出来，就得到组织自身的一张邻接矩阵。</p>
 
 <table>
-<thead><tr><th>切片</th><th class="num">窗口数</th>
-<th class="num">交接次数</th><th>最高频的几对</th></tr></thead>
+<thead><tr><th>样本</th><th class="num">窗口数</th>
+<th class="num">交接次数</th><th class="num">P3 占比</th>
+<th>最高频的几对</th></tr></thead>
 <tbody>
-<tr><td class="mono">5k</td><td class="num">722</td><td class="num">297</td><td>P1–P3 80 · P3–P4 54 · P1–P2 39</td></tr><tr><td class="mono">lc</td><td class="num">1364</td><td class="num">1153</td><td>P0–P4 283 · P3–P4 255 · P0–P3 223</td></tr>
+<tr><td class="mono">5k</td><td class="num">722</td><td class="num">308</td><td class="num"><strong>84%</strong></td><td>P1–P3 132 · P2–P3 112 · P1–P2 41</td></tr><tr><td class="mono">lc</td><td class="num">1364</td><td class="num">971</td><td class="num"><strong>71%</strong></td><td>P0–P3 386 · P2–P3 265 · P0–P2 252</td></tr><tr><td class="mono">luad</td><td class="num">954</td><td class="num">587</td><td class="num"><strong>78%</strong></td><td>P0–P3 200 · P1–P3 151 · P2–P3 106</td></tr>
 </tbody></table>
 
 <figure><img src="figures/5k_transitions.png"
@@ -328,15 +354,29 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
 
 <figure><img src="figures/lc_transitions.png"
  alt="lc 模式图与交接边界">
- <figcaption>lc。1,153 次交接对 5k 的 297 次 —— 这就是一张窗口数翻倍、且镶嵌
- 更为交错的切片该有的样子。</figcaption></figure>
+ <figcaption>lc。971 次交接，是三个样本里镶嵌最交错的。</figcaption></figure>
+
+<figure><img src="figures/luad_transitions.png"
+ alt="luad 模式图与交接边界">
+ <figcaption>luad。587 次交接。</figcaption></figure>
 
 <div class="callout">
-<strong>唯一同时通过两项检验的关系。</strong>P3–P4 在<em>两张</em>切片上都是
-最高频的交接之一（5k 上 54 次，lc 上 255 次），而且它在两次伪时序排序里也都是
-相邻的一对。空间邻接和扩散排序是两个独立的计算 —— 一个数切片上的边，一个量特征
-空间里的距离 —— 所以两者一致是本分析所支持的最强的一条单一结论。矩阵里没有
-别的配对能在两个供体上重复出现。
+<strong>P3 是界面模式，这是三个独立样本都支持的唯一结论。</strong>
+它参与了三张切片上 71%–84% 的全部交接（5k 84%、lc 71%、luad 78%），
+而且它的最高频搭档 P0 或 P1 也都排在前列。三条独立证据在同一处汇合：
+
+<ul style="margin:8px 0 0;padding-left:20px">
+<li><strong>空间交接</strong>（本节）：P3 参与 71–84% 的相邻异物边界。</li>
+<li><strong>扩散排序</strong>（上节）：P3 在三个样本的轴上都是第 3 位（共 4 个）。</li>
+<li><strong>细胞组成</strong>（第 6 节）：P3 的组织块始终是混合表型 ——
+5k 的 P3 是 AT2_like + cil + fib + plasma，luad 的 P3 是 b + fib + nkt + plasma ——
+而不是像 5k 的 P2 那样清一色 cil。一个纯粹的细胞类型不可能成为界面。</li>
+</ul>
+
+三项计算互不依赖：一个数切片上的边，一个量特征空间里的距离，一个读每个组织块里
+的细胞类型。它们指向同一个模式，这比任何单项都更有说服力。<br><br>
+<strong>但要注意反面：</strong>起点的模式、其余三者的相对次序、以及所有中位数的
+具体数值，在三个样本之间都不一致。能被支持的只有 P3 这一个位置，不是一整条谱系。
 </div>
 
 <h3>演化动画</h3>
@@ -346,16 +386,19 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
 
 <figure><img src="figures/5k_evolution.gif"
  alt="沿扩散伪时序的演化动画，5k">
- <figcaption>5k。根为 P3，顺序 P3 → P2 → P4 → P0 → P1。轴上的色带是各模式
- 伪时序的第 10–90 百分位，所以带宽是可读性上的选择，而它们的重叠是真实的。
- 组织块后面那片淡色肺是<strong>参考解剖</strong> —— BodyParts3D 的人类肺，
- 来自图谱，不是对这份标本的重建；只有中间的内嵌块是测量值。</figcaption></figure>
+ <figcaption>5k。根为 P2，顺序 P2 → P0 → P3 → P1。组织块后面那片淡色肺是
+ <strong>参考解剖</strong> —— BodyParts3D 的人类肺，来自图谱，不是对这份标本的
+ 重建；只有中间的内嵌块是测量值。</figcaption></figure>
 
 <figure><img src="figures/lc_evolution.gif"
  alt="沿扩散伪时序的演化动画，lc">
- <figcaption>lc。根为 P0，顺序 P0 → P3 → P1 → P4 → P2。两个独立供体给出两种
- 顺序，这本身就是信息：这条轴在两者上都复现出「从根到远端」的结构，但顺序的
- 中段并不一致。</figcaption></figure>
+ <figcaption>lc。根为 P0，顺序 P0 → P2 → P3 → P1。</figcaption></figure>
+
+<figure><img src="figures/luad_evolution.gif"
+ alt="沿扩散伪时序的演化动画，luad">
+ <figcaption>luad。根为 P1，顺序 P1 → P0 → P3 → P2。第三个样本的根部模式与
+ 前两个都不同 —— 这正是为什么这条轴只能作为「形态学电影」来看，
+ 而不能当作观测到的时间。</figcaption></figure>
 
 <p class="note">肺是作为方位参照画的，刻意保持淡色且没有纹理。
 <a href="https://kainblue100.github.io/coda-mouse-lung-volume/">CODA 小鼠肺项目</a>
@@ -382,10 +425,11 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
 <td><strong>对方更好。</strong>我们的最密组织块落在了低质量细胞带上；修复之前
 P0 和 P2 正是这样。</td></tr>
 
-<tr><td>窗口尺寸</td><td>H&amp;E 金字塔的 224 px —— 在 5k 上是 243 µm，但在 lc
-上只有 112 µm</td><td>在微米空间里定义 400 µm，每张切片完全一致</td>
-<td><strong>对方更好，而且很关键。</strong>用像素定义的瓦片在不同切片上代表不同
-数量的组织，因此同一个模式不可能在两张切片上含义相同。这是我们这条链里最严重的
+<tr><td>窗口尺寸</td><td>H&amp;E 金字塔的 224 px —— 在 5k 上是 243 µm，lc 上 112 µm，
+ luad 上 104 µm</td><td>在微米空间里定义 400 µm，每张切片完全一致</td>
+<td><strong>对方更好，而且很关键。</strong>用像素定义的瓦片在不同样本上代表不同
+数量的组织 —— 我们自己这条链上就是 243 µm、112 µm 和 104 µm，相差 2.3 倍 ——
+因此同一个模式在不同样本上不可能含义相同。这是我们这条链里最严重的
 缺陷。</td></tr>
 
 <tr><td>最小细胞数</td><td>≥ 10 个细胞且 ≥ 30% 染色组织</td>
@@ -413,7 +457,7 @@ P0 和 P2 正是这样。</td></tr>
 
 <tr><td>细簇</td><td>k 固定为 64</td>
 <td>k ∈ {6–20}，用轮廓系数选择，留 0.01 的余量 → 10</td>
-<td><strong>对方更好。</strong>64 是 HIPPO 在 227k 个瓦片上的取值；在 2,086 个
+<td><strong>对方更好。</strong>64 是 HIPPO 在 227k 个瓦片上的取值；在 3,040 个
 瓦片上它是任意的，轮廓系数也说明了这一点。</td></tr>
 
 <tr><td>合并成表型</td><td>簇心的 Pearson 相关 → 在相关矩阵上做 GMM，G ≤ 15</td>
@@ -441,31 +485,38 @@ P0 和 P2 正是这样。</td></tr>
 <td><strong>对方更好。</strong>我们第一版 Blender 也用了自创的低饱和调色板，
 这就是为什么球体渲出来是暗紫色而不是玫瑰色。</td></tr>
 
-<tr><td>切片数</td><td>2（5k、lc）</td><td>3（多一张 luad）</td><td>对方更多。</td></tr>
+<tr><td>样本数</td><td>3（5k、lc、luad）</td><td>3</td>
+<td>持平。补齐第三个样本之后这一项不再有差距；此前只有两个样本时，
+跨样本可复现的结论只有一条，补上 luad 之后仍然只有一条，但那条被三重验证了。</td></tr>
 </tbody></table>
 
 <div class="callout warn">
 <strong>诚实的小结。</strong>十四步里，Annotile 有十一步更好，我们有两步更好
-（学习式图像嵌入、染色归一化），一步是真正的取舍（配准）。窗口尺寸和共享基因
-坐标轴这两点不是表面问题：它们意味着这条链产出的模式无法像 Annotile 的那样在
-切片之间比较，而跨切片可比正是它主张的核心。如果目标是结果而不是练习，那么该用
-的实现是 Annotile。
+（学习式图像嵌入、染色归一化），一步是真正的取舍（配准）。补齐第三个样本之后，
+样本数这一项从落后变成持平，结论随之变化：补上 luad 之前，跨样本可复现的只有
+「P3–P4 在两片里都相邻」这一条弱结论；补上之后，同一个 P3 变成了三个独立样本上
+都被三重验证的界面模式。第三个样本没有改变方法，但它把唯一一条结论从「两片里
+碰巧都出现」提升成了「三片里稳定成立」。<br><br>
+窗口尺寸和共享基因坐标轴这两点仍然不是表面问题：它们意味着这条链产出的模式无法像
+Annotile 的那样在切片之间比较，而跨切片可比正是它主张的核心。如果目标是结果而不是
+练习，那么该用的实现是 Annotile。
 </div>
 
 <h2>9. 本项目不能说明什么</h2>
 <div class="callout warn">
 <ul style="margin:0;padding-left:20px">
-<li><strong>只有两张切片。</strong>来自 5k 和 lc 的 2,086 个瓦片。HIPPO 用了
-209 个病人的 227,000 个瓦片。这里没有任何东西支持关于群体的结论，也没有尝试任何
-病人层面的步骤。第三张切片（luad）仍在下载中。</li>
+<li><strong>三个样本。</strong>来自 5k、lc 和 luad 的 3,040 个瓦片。HIPPO 用了
+209 个病人的 227,000 个瓦片。三个样本足以检验一个结论是否跨样本成立 ——
+P3 的界面性质就是这样得到的 —— 但远不足以支持任何关于群体的陈述，也没有尝试任何
+病人层面的步骤。</li>
 <li><strong>没有生存终点。</strong>HIPPO 用总生存和无病生存来验证它的亚型。
 这些 10&amp;x 数据集不附带临床随访，所以这篇论文的预后部分在本数据上无法检验。</li>
-<li><strong>CNN 小，数据也小。</strong>1.21M 参数对 2,086 个瓦片，而对方是
-227,000 个瓦片上的 ResNet50。对比损失从 4.08 降到 0.85，说明它确实学到了东西，
+<li><strong>CNN 小，数据也小。</strong>1.21M 参数对 3,040 个瓦片，而对方是
+227,000 个瓦片上的 ResNet50。对比损失从 3.87 降到 0.79，说明它确实学到了东西，
 但图像分支是这个移植里最弱的一环，消融的排序要放在这个前提下读。</li>
-<li><strong>Reinhard 归一化是跨切片做的，这是刻意的。</strong>参考统计量取自第一张
-切片，两张都被映射到它上面。把每张切片各自归一化，恰恰会抹掉聚类本该看到的那些
-切片间差异。</li>
+<li><strong>Reinhard 归一化是跨样本做的，这是刻意的。</strong>参考统计量取自第一张
+切片（5k），三张都被映射到它上面。把每张各自归一化，恰恰会抹掉聚类本该看到的那些
+样本间差异。luad 的 L 均值是 53.09，被拉到 68.35。</li>
 </ul>
 </div>
 

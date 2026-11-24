@@ -27,10 +27,12 @@ TENX = "/mnt/storage/bzhang/AIVC/cellhippo/tenx"
 OUT = os.path.join(FIGS, "transitions")
 
 MAP = {"5k": ("3.0.0", "Xenium_Prime_Human_Lung_Cancer_FFPE"),
-       "lc": ("2.0.0", "Xenium_V1_Human_Lung_Cancer_Addon_FFPE")}
+       "lc": ("2.0.0", "Xenium_V1_Human_Lung_Cancer_Addon_FFPE"),
+       "luad": ("2.0.0", "Xenium_V1_humanLung_Cancer_FFPE")}
 
 PATTERN_RGB = {0: (194, 65, 12), 1: (29, 78, 216), 2: (15, 118, 110),
-               3: (124, 58, 237), 4: (219, 39, 119)}
+               3: (124, 58, 237), 4: (219, 39, 119), 5: (180, 83, 9),
+               6: (2, 132, 199), 7: (22, 163, 74)}
 
 
 def build_grid(tag, name):
@@ -147,15 +149,16 @@ def main():
         grid = build_grid(tag, a.name)
         pairs, edges = transition_matrix(grid)
         ks = sorted(set(grid.values()))
-        M = np.zeros((5, 5), dtype=int)
+        ng = max(ks) + 1 if ks else 0
+        M = np.zeros((ng, ng), dtype=int)
         for (p, q), n in pairs.items():
-            if p < 5 and q < 5:
+            if p < ng and q < ng:
                 M[p, q] = M[q, p] = n
         print(f"\n=== {tag} ===")
-        print("  transition matrix (adjacent windows, different patterns):")
-        print("      " + "".join(f"P{j:>7}" for j in range(5)))
-        for i in range(5):
-            print(f"   P{i} " + "".join(f"{M[i, j]:7d}" for j in range(5)))
+        print(f"  transition matrix (adjacent windows, different patterns):")
+        print("      " + "".join(f"P{j:>7}" for j in range(ng)))
+        for i in range(ng):
+            print(f"   P{i} " + "".join(f"{M[i, j]:7d}" for j in range(ng)))
         top = pairs.most_common(6)
         print("  most common handovers: " + ", ".join(
             f"P{p}-P{q} {n}" for (p, q), n in top))
