@@ -157,6 +157,41 @@ _p = os.path.join(DOCS, "serial_volume.json")
 if os.path.exists(_p):
     SERIAL = json.load(open(_p, encoding="utf-8"))
 
+SENS = {}
+_p = os.path.join(DOCS, "sensitivity.json")
+if os.path.exists(_p):
+    SENS = json.load(open(_p, encoding="utf-8"))
+
+sens_rows = ""
+_s_strict, _s_relax = SENS.get("strict", {}), SENS.get("relaxed", {})
+if _s_strict and _s_relax:
+    def _row(label, fn):
+        return (f'<tr><td>{label}</td>'
+                f'<td class="num">{fn(_s_strict)}</td>'
+                f'<td class="num">{fn(_s_relax)}</td></tr>')
+    sens_rows += _row("窗口数", lambda e: f"{e['tiles']:,}")
+    sens_rows += _row("模式数", lambda e: e["patterns"])
+
+    def _hub(e):
+        h = e["hub"]
+        agree = sum(1 for v in h.values() if v["biggest_hub"] == 3)
+        names = ", ".join(f"{s}:P{v['biggest_hub']}" for s, v in h.items())
+        return f"{agree}/3 · {names}"
+    sens_rows += _row("P3 是否为枢纽", _hub)
+
+    def _ho(e):
+        return " / ".join(f"{v}" for v in e["handovers"].values())
+    sens_rows += _row("交接次数", _ho)
+
+    def _sep(e):
+        s = e["separation"]
+        return f"{s['min']:.3f}–{s['max']:.3f}"
+    sens_rows += _row("模式间余弦距离", _sep)
+
+    def _modr(e):
+        return " / ".join(f"{v:+.2f}" for v in e["modality_r"].values())
+    sens_rows += _row("模态一致 r", _modr)
+
 serial_corr_rows = ""
 _secs = SERIAL.get("sections", [])
 for _i, _r in enumerate(SERIAL.get("adjacent_correlation_aligned", [])):
@@ -556,21 +591,13 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
  <figcaption>luad。587 次交接。</figcaption></figure>
 
 <div class="callout">
-<strong>P3 是一个反复出现的空间界面域，这是三个独立样本都支持的结论。</strong>
-它参与了三张切片上 71%–84% 的全部交接（5k 84%、lc 71%、luad 78%）。
-两条互相独立的证据在同一处汇合：
-
-<ul style="margin:8px 0 0;padding-left:20px">
-<li><strong>空间交接</strong>（本节）：P3 参与 71–84% 的相邻异物边界。</li>
-<li><strong>迁移方向</strong>（下节）：P0 → P3 是三个样本上唯一都成立的有向边，
-且三次都是到上游的最短特征距离。</li>
-</ul>
-
-一项数切片上的边，一项比较特征距离，两者互不依赖（具体数值见第 8 节）。<br><br>
-<strong>但要注意反面，而且这一点很重要：</strong>第 8 节的整体分析显示，这四个模式
-在<em>细胞类型上几乎无法区分</em>（两两余弦距离只有 0.011–0.084），换一种模态样本
-之间的相似性排序还会翻转。所以 P3 成立的是它在组织里的<em>空间</em>角色，不是它的
-细胞类型身份。把它称为「细胞类型表型」是不成立的；诚实的说法是空间组织域。
+<strong>P3 在严格参数下是三个样本共同的枢纽 —— 但仅限严格参数下。</strong>
+它参与了三张切片上 71%–84% 的全部交接（5k 84%、lc 71%、luad 78%），
+并且 P0 → P3 是三个样本上唯一都成立的有向边。<br><br>
+<strong>第 8 节证明这条结论不稳健。</strong>把窗口数从 3,040 提到 3,430（+13%）
+之后：P3 仍然是 5k 和 lc 的枢纽（83% / 89%），但 luad 的所有连接都汇聚到 P1，
+P3 只剩 67% 且只靠 P1 这一条边；同时三个样本的模式归属大幅重排。
+<strong>正确的说法是：P3 是这组参数下的最大界面域，不是数据里稳健存在的结构。</strong>
 </div>
 
 <h3>模式之间的迁移方向</h3>
@@ -700,6 +727,41 @@ nkt 约 14%、mph 约 12%。<br>
 相邻同色、交界可数，第 7 节的 P3 界面结论建立在那个事实上，而不是建立在细胞类型
 上。但把它们称为「细胞类型表型」是不成立的。诚实的说法是
 <strong>空间组织域</strong>，其中 P3 是一个位置稳定、反复出现的界面域。</p>
+</div>
+
+<h3>把样本量加大，聚类会变吗？</h3>
+<p>这一节本来是为了加第 4 个供体，但那个数据集（<span class="mono">Xenium_V1_Human_Lung_Cancer_FFPE</span>）
+的 H&E 有 2.7 GB，10x 的 CDN 把单连接限制在约 0.2 MB/s（服务器到 Cloudflare 实测
+是 10 MB/s，所以瓶颈在 CDN 侧）。分片并行能到约 1.5 MB/s，但连接会被中途掐断。
+所以先用<strong>放宽切块过滤</strong>做一个真正的样本量测试：把染色组织阈值从 60% 降到 45%、
+细胞数下限从 10 降到 5，窗口数从 3,040 增到 3,430（+13%），然后用完全相同的流程
+重跑一遍聚类。</p>
+
+<table>
+<thead><tr><th>指标</th><th class="num">严格（3,040）</th>
+<th class="num">放宽（3,430）</th></tr></thead>
+<tbody>
+{sens_rows}
+</tbody></table>
+
+<div class="callout warn">
+<strong>结果：只有「模式数是 4」这一项不变，其余全部改变。</strong>
+<ul style="margin:8px 0 0;padding-left:20px">
+<li>三个样本的模式构成<strong>大幅重排</strong>。严格版里 P3 在三片都是最大的
+（49.6% / 36.4% / 34.2%）；放宽版里 P3 是 24.3% / 56.3% / <strong>3.2%</strong>
+—— 在 luad 上几乎消失。</li>
+<li><strong>P3 作为枢纽只保住 2/3。</strong>严格版三片都成立（84% / 71% / 78%）；
+放宽版在 5k 和 lc 上更高（83% / 89%），但 luad 的所有连接都汇聚到 P1，
+P3 只剩 67% 且完全依赖 P1 这一条边。</li>
+<li>luad 的交接次数从 587 掉到 <strong>166</strong>（−72%）。</li>
+<li>三个样本的伪时序顺序<strong>全部改变</strong>。</li>
+<li>模态一致性的相关从 −0.98 / −0.44 / +0.85 变成 −0.56 / −0.58 / −0.62。</li>
+</ul>
+<p style="margin-top:10px">唯一变好的是模式之间的可分性：余弦距离从 0.011–0.084
+（几乎重合）升到 0.027–0.200。放宽过滤确实让模式之间拉开了一点，但仍然很小。<br><br>
+<strong>诚实的结论：这 4 个模式不是数据里稳定存在的实体。</strong>窗口数变动 13%
+就足以重排归属、换掉枢纽、翻转顺序。所以第 7 节里 P3 的说法必须再降一级：它是
+<em>严格参数下</em>三片都出现的最大枢纽，不是跨参数稳健的结构。</p>
 </div>
 
 <h2>9. 真实的连续切片：同一肿瘤的 3D 体积</h2>
