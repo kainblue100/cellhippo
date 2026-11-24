@@ -152,11 +152,6 @@ for _ab, _v in (CROSS.get("stability") or {}).items():
     if _ab == "ab_img":
         mod_r_img = f'{_v["sample_pair_r"]:+.2f}'
 
-SERIAL = {}
-_p = os.path.join(DOCS, "serial_volume.json")
-if os.path.exists(_p):
-    SERIAL = json.load(open(_p, encoding="utf-8"))
-
 SENS = {}
 _p = os.path.join(DOCS, "sensitivity.json")
 if os.path.exists(_p):
@@ -229,13 +224,6 @@ if _s_strict and _s_relax:
         return " / ".join(f"{v:+.2f}" for v in e["modality_r"].values())
     sens_rows += _row("模态一致 r", _modr)
 
-serial_corr_rows = ""
-_secs = SERIAL.get("sections", [])
-for _i, _r in enumerate(SERIAL.get("adjacent_correlation_aligned", [])):
-    _u = SERIAL.get("adjacent_correlation_unaligned", [])
-    serial_corr_rows += (f'<tr><td class="mono">{_secs[_i]} → {_secs[_i+1]}</td>'
-                         f'<td class="num"><strong>{_r:.2f}</strong></td>'
-                         f'<td class="num">{_u[_i]:.2f}</td></tr>')
 
 mig_rows = ""
 for _tag in ("5k", "lc", "luad"):
@@ -939,72 +927,7 @@ P0 与 P1 相差 <strong>0.002</strong> —— 细胞类型组成上实质是同
 一个 batch 两次共 64 次小 kernel 启动，实测 6 s/step；改成一次批处理
 <span class="mono">grid_sample</span> 后 54 s/epoch → 0.3 s/epoch。</p>
 
-<h2>11. 真实的连续切片：同一肿瘤的 3D 体积</h2>
-<p>第 6 节的 3D 是从<em>单张</em>二维切片合成出来的组织块，z 方向没有任何测量。
-这里换成一个真的：Pentimalli 等 2025 年（<em>Cell Systems</em>）把一块非小细胞
-肺癌蜡块切成 34 张连续 5 µm 切片，其中第 4、10、16、22、28、34 张用 CosMx 成像，
-层间距 30 µm，并用 STIM 配准到同一坐标系。六个坐标表共
-<span class="mono">340,641</span> 个细胞位置，公开在 Zenodo
-<a href="https://doi.org/10.5281/zenodo.15240431">15240431</a>。</p>
-
-<p>这不一样：这些细胞真的来自同一块组织的相邻层面。体积是用射线步进
-（emission–absorption）渲染的占据网格，<strong>每个体素都是配准后细胞质心的计数，
-没有任何东西是推断出来的</strong>。</p>
-
-<figure><img src="figures/serial/serial_hero.png"
- alt="连续切片体积的三分之四视角">
- <figcaption>三分之四视角。4.0 mm × 4.0 mm × 150 µm。</figcaption></figure>
-
-<div class="grid">
- <div class="stat"><div class="v">340,641</div>
-  <div class="l">放进去的细胞质心</div></div>
- <div class="stat"><div class="v">6</div>
-  <div class="l">连续切片（5 µm 厚，30 µm 间隔）</div></div>
- <div class="stat"><div class="v">150 µm</div>
-  <div class="l">真实 z 深度</div></div>
- <div class="stat"><div class="v">0.49–0.69</div>
-  <div class="l">相邻层密度相关</div></div>
-</div>
-
-<h3>配准是否真的成立</h3>
-<p>把相邻两层的细胞密度投影成二维，用 80 µm 的格子做相关。如果 STIM 没有把切片
-对齐，同样的结构不会落在同样的位置上，相关就会塌掉。所以这个数字既验证了配准，
-也验证了「这叠起来的东西是一个整体」。</p>
-
-<table>
-<thead><tr><th>相邻层</th><th class="num">配准后 r</th>
-<th class="num">未配准 r</th></tr></thead>
-<tbody>
-{serial_corr_rows}
-</tbody></table>
-
-<p class="note">每一对都是配准后更高，这就是配准产生作用的证据。这套数字与原始
-文献自己报的 0.69 / 0.49 / 0.50 / 0.67 / 0.54 基本一致 —— 两个独立实现得到同一组
-数值，说明复现是对的。<br>
-第一次跑的时候用的是 <strong>8 µm</strong> 格子，得到的相关只有 0.04–0.06，
-而且配准后并不比未配准好。原因是 8 µm 下 78% 的格子是空的、每格最多 4 个细胞，
-Pearson 完全被泊松噪声主导 —— 这个参数错得足以让结论变成「配准没用」。
-换成 80 µm 后信号才出来。</p>
-
-<figure><img src="figures/serial/serial_front.png"
- alt="体积的正视图">
- <figcaption>正视。这是 150 µm 厚的组织薄片，因此从正面看几乎是透明的；
- 结构在斜视和俯视下才显示出来。</figcaption></figure>
-
-<figure><img src="figures/serial/serial_top.png"
- alt="体积的俯视图">
- <figcaption>俯视，沿着切片叠加方向看下去。</figcaption></figure>
-
-<div class="callout">
-<strong>这个体积只包含位置，不包含类型。</strong>这六个坐标表只有 x 和 y 两列，
-没有细胞类型、没有表达。所以它证明的是<em>结构</em>在 z 方向上是连续的 —— 空白区
-在六层里都还在，密度模式能对上 —— 而不能说明任何模式的类型组成。
-把 P0–P3 标到这个体积上需要 CosMx 的表达矩阵，这次没有下载。<br><br>
-它同样<strong>与 5k / lc / luad 无关</strong>：那是另外一例肿瘤、另一种技术
-（CosMx 而非 Xenium），不能叠加在一起。
-</div>
-
-<h2>12. 与 Annotile 的逐步比较</h2>
+<h2>11. 与 Annotile 的逐步比较</h2>
 <p><a href="https://kainblue100.github.io/annotile/">Annotile</a> 解决的是同一个
 问题，而且逐步来看，它大部分做得更好。这张表是照着它的源码读的，不是照它的文字
 描述。</p>
@@ -1100,7 +1023,7 @@ Annotile 的那样在切片之间比较，而跨切片可比正是它主张的�
 练习，那么该用的实现是 Annotile。
 </div>
 
-<h2>13. 本项目不能说明什么</h2>
+<h2>12. 本项目不能说明什么</h2>
 <div class="callout warn">
 <ul style="margin:0;padding-left:20px">
 <li><strong>三个样本。</strong>来自 5k、lc 和 luad 的 3,040 个瓦片。HIPPO 用了
@@ -1118,7 +1041,7 @@ P3 的界面性质就是这样得到的 —— 但远不足以支持任何关于
 </ul>
 </div>
 
-<h2>14. 复现</h2>
+<h2>13. 复现</h2>
 <pre>python tools/fetch_10x_all.py            # 矩阵 + 坐标 + H&amp;E
 python tools/register_final.py          # 旋转、尺度、平移
 python tools/extract_tiles.py --tag 5k  # HIPPO 式切块 + 三种模态
@@ -1133,7 +1056,10 @@ python tools/trajectory.py --tags 5k lc luad    # 扩散伪时序
 python tools/transitions.py --tags 5k lc luad   # 相邻窗口的交接计数
 python tools/migration.py --tags 5k lc luad     # 有向迁移图
 python tools/cross_sample.py                    # 三个样本的整体比较
-python tools/serial_volume.py                   # 连续切片的真实 3D 体积</pre>
+python tools/assemble_lcm.py                    # 17 片队列的细胞表
+python tools/extract_tiles_lcm.py --tile 224    # 17 片切块（改 --tile 即尺度梯度）
+python tools/lcm_analysis.py --name lcm_fused --tiledir work/lcm_tiles
+python tools/lcm_scale_summary.py               # 三个尺度的对照</pre>
 
 <p class="note">前四步在服务器上跑（<span class="mono">vcellx</span> 虚拟环境），
 Blender 渲染在本地跑（服务器上没有 <span class="mono">bpy</span> 的 wheel）。
