@@ -162,6 +162,43 @@ _p = os.path.join(DOCS, "sensitivity.json")
 if os.path.exists(_p):
     SENS = json.load(open(_p, encoding="utf-8"))
 
+# ---- 17-sample cohort -------------------------------------------------------
+LCM = {}
+_p = os.path.join(DOCS, "lcm_analysis.json")
+if os.path.exists(_p):
+    LCM = json.load(open(_p, encoding="utf-8"))
+LCM_F = {}
+_p = os.path.join(DOCS, "lcm_fused.json")
+if os.path.exists(_p):
+    LCM_F = json.load(open(_p, encoding="utf-8"))
+SCALE = {}
+_p = os.path.join(DOCS, "lcm_scale.json")
+if os.path.exists(_p):
+    SCALE = json.load(open(_p, encoding="utf-8"))
+
+lcm_rows = ""
+if LCM.get("composition"):
+    _sig = LCM.get("signature", {})
+    for _k, _row in enumerate(LCM["composition"]):
+        _top = list((_sig.get(str(_k)) or {}).items())[:3]
+        _cells = "".join(f'<td class="num">{v*100:.0f}%</td>' for v in _row)
+        lcm_rows += (f'<tr><td class="mono">P{_k}</td>{_cells}'
+                     f'<td>{" · ".join(f"{a} {v*100:.0f}%" for a, v in _top)}</td></tr>')
+
+scale_rows = ""
+for _tag, _um in (("112", 95), ("224", 190), ("448", 381)):
+    _d = SCALE.get(_tag) or {}
+    if not _d:
+        continue
+    _sep = _d.get("separation") or {}
+    _lo = f'{_sep["min"]:.3f}' if _sep else "—"
+    _hi = f'{_sep["max"]:.3f}' if _sep else "—"
+    scale_rows += (f'<tr><td class="mono">{_um} µm</td>'
+                   f'<td class="num">{_tag} px</td>'
+                   f'<td class="num">{_d["tiles"]:,}</td>'
+                   f'<td class="num"><strong>{_d["patterns"]}</strong></td>'
+                   f'<td class="num">{_lo} – {_hi}</td></tr>')
+
 sens_rows = ""
 _s_strict, _s_relax = SENS.get("strict", {}), SENS.get("relaxed", {})
 if _s_strict and _s_relax:
@@ -764,7 +801,145 @@ P3 只剩 67% 且完全依赖 P1 这一条边。</li>
 <em>严格参数下</em>三片都出现的最大枢纽，不是跨参数稳健的结构。</p>
 </div>
 
-<h2>9. 真实的连续切片：同一肿瘤的 3D 体积</h2>
+<h2>9. 第二个队列：17 个样本</h2>
+<p>服务器上另有一套数据（<span class="mono">/mnt/storage/bzhang/data/lung_cancer_model</span>，
+186 GB）：同一课题组的 <strong>17 张 Xenium 切片</strong>，全部使用同一个 302 基因的
+<span class="mono">hLung_100g</span> 面板。用完全相同的流程重跑了一遍，以便和前面
+三片的结论对照。</p>
+
+<h3>这一套数据和前一套不是同一种东西</h3>
+<table>
+<thead><tr><th>维度</th><th>三片队列</th><th>17 片队列</th></tr></thead>
+<tbody>
+<tr><td>样本 / 细胞</td><td>3 / 650k</td><td><strong>17 / 2.54M</strong></td></tr>
+<tr><td>基因面板</td><td>5,001 / 480 / 377（各不相同）</td>
+<td><strong>302（完全一致）</strong></td></tr>
+<tr><td>瓦片边长</td><td>243 / 112 / 104 µm（各不相同）</td>
+<td><strong>190 µm（统一）</strong></td></tr>
+<tr><td>细胞注释</td><td>数据方提供，100% 覆盖</td>
+<td><strong>由 marker 推导</strong>，44% 可归入某一类</td></tr>
+<tr><td>图像模态</td><td>H&E，已配准</td>
+<td><strong>Xenium morphology</strong>，非 H&amp;E</td></tr>
+</tbody></table>
+
+<p class="note">两个"非"必须说清楚。<strong>注释是推的</strong>：这 17 片的 Seurat
+对象里只有 <span class="mono">seurat_clusters</span>（res 0.3 的无监督表达簇，跨样本
+不可比），没有细胞类型。我用 11 组 marker 在 302 基因面板上打分得到注释，其中
+56% 的细胞无法归入任何类 —— 因为每细胞中位转录本只有 152 个。
+<strong>图像不是 H&amp;E</strong>：这批数据没有随附配准矩阵，而 H&amp;E 的隐含尺度是
+1.383 × 1.335 px/µm（各向异性 3.5%），无法在 17 片上逐一验证。morphology 叠加图
+按构造就在细胞坐标系里（0.2125 µm/px），所以用它。</p>
+
+<h3>结果</h3>
+<div class="grid">
+ <div class="stat"><div class="v">{LCM_F.get('n_tiles', 0):,}</div>
+  <div class="l">瓦片（三片队列是 3,040）</div></div>
+ <div class="stat"><div class="v">{LCM_F.get('n_phenotypes', 0)}</div>
+  <div class="l">融合聚类得到的模式数</div></div>
+ <div class="stat"><div class="v">56%</div>
+  <div class="l">无法归入任何细胞类型的细胞</div></div>
+ <div class="stat"><div class="v">302</div>
+  <div class="l">17 片共用的基因数</div></div>
+</div>
+
+<table>
+<thead><tr><th>模式</th><th class="num">各样本占比最小值–最大值</th>
+<th>细胞类型特征（前三）</th></tr></thead>
+<tbody>
+<tr><td class="mono">P0</td><td class="num">4.5% – 48.4%</td>
+<td>unassigned 58% · AT2 19% · epi 7%</td></tr>
+<tr><td class="mono">P1</td><td class="num">23.6% – 79.5%</td>
+<td>unassigned 55% · AT2 18% · fib 7%</td></tr>
+<tr><td class="mono">P2</td><td class="num">7.7% – 37.8%</td>
+<td>unassigned 54% · epi 17% · AT2 12%</td></tr>
+</tbody></table>
+
+<figure><img src="figures/lcm/lcm_composition.png"
+ alt="17 个样本的模式构成">
+ <figcaption>每个样本的瓦片落在各模式的比例。三种模式在全部 17 个样本里都出现，
+ 但比例波动很大（P1 从 23.6% 到 79.5%）。</figcaption></figure>
+
+<figure><img src="figures/lcm/lcm_signature.png"
+ alt="每个模式的细胞类型特征">
+ <figcaption>每个模式的细胞类型特征。三行几乎一样 —— 见下节。</figcaption></figure>
+
+<figure><img src="figures/lcm/lcm_spatial.jpg"
+ alt="17 个样本的空间模式图">
+ <figcaption>17 个样本各自的模式分布。每格一个样本，颜色同前。</figcaption></figure>
+
+<figure><img src="figures/lcm/lcm_gallery.jpg"
+ alt="17 个样本的代表性瓦片">
+ <figcaption>每行一个样本，取该样本最大模式的代表性瓦片。</figcaption></figure>
+
+<div class="callout warn">
+<strong>17 片的结论比 3 片更糟，而原因可以说清楚。</strong>
+<ul style="margin:8px 0 0;padding-left:20px">
+<li>模式间余弦距离只有 <strong>0.002 – 0.028</strong>（三片是 0.011 – 0.084）。
+P0 与 P1 相差 <strong>0.002</strong> —— 细胞类型组成上实质是同一个东西。</li>
+<li>原因是 <span class="mono">unassigned</span> 在每个模式里都占 54–58%，它压过了
+真正的细胞类型差异。</li>
+<li>换言之：<strong>样本量涨了 3.9 倍，注释这一维反而更没起作用</strong>，因为
+302 基因 + 每细胞 152 个转录本推不出足够细的注释。</li>
+</ul>
+</div>
+
+<h2>10. 窗口尺度的梯度分析</h2>
+<p>一个模式如果只在某个窗口尺寸下存在，那它是窗口的性质，不是组织的性质。所以把
+窗口从 95 µm 到 381 µm 扫了一遍，每个尺度都走完整的 切块 → CNN → 聚类 流程。</p>
+
+<table>
+<thead><tr><th>窗口边长</th><th class="num">像素</th><th class="num">瓦片数</th>
+<th class="num">模式数</th><th class="num">模式间余弦距离</th></tr></thead>
+<tbody>
+{scale_rows}
+</tbody></table>
+
+<div class="callout warn">
+<strong>模式数随窗口单调递减：5 → 3 → 2。</strong>
+
+<p style="margin-top:10px">窗口变大 4 倍，模式数少了 60%。这不是"大窗口更稳定"，
+而是"大窗口把差异平均掉了"：在 95 µm 下还能分辨的局部结构，在 381 µm 下被同一个
+窗口内的混合组织抹平。</p>
+
+<p><strong>更关键的是可分性没有随尺度改善。</strong>381 µm 下只剩两个模式，它们的
+余弦距离是 <strong>0.003</strong> —— 两个模式在细胞类型上完全无法区分。三个尺度
+下最大模式的细胞类型特征也几乎一样：</p>
+
+<table>
+<thead><tr><th>窗口</th><th>最大模式的细胞类型特征</th></tr></thead>
+<tbody>
+<tr><td class="mono">95 µm</td><td>unassigned 56% · AT2 15% · fib 9% · mph 5%</td></tr>
+<tr><td class="mono">190 µm</td><td>unassigned 58% · AT2 19% · epi 7% · fib 4%</td></tr>
+<tr><td class="mono">381 µm</td><td>unassigned 55% · AT2 17% · fib 7% · epi 6%</td></tr>
+</tbody></table>
+
+<p>三个尺度都在说同一件事：<strong>最大的那个模式就是"组织本身"，它被
+<span class="mono">unassigned</span> 主导，没有可辨认的细胞类型身份。</strong>
+剩下的模式是在更细的尺度上把它的残余变异切开 —— 切几刀由窗口大小决定。</p>
+
+<p><strong>这对前面的结论意味着什么。</strong>第 7 节里 P3 的界面性质、第 8 节里
+三个样本的构成相关，都是在 190 µm / 224 px 这一档下得到的。尺度梯度说明这些数字
+不能跨尺度搬运。一个诚实的表述是：<em>在 190 µm 的窗口下，这三个样本的聚类给出
+了若干个空间上成片的区域，其中 P3 是交界最多的那个；换成 95 µm 会得到 5 个，
+换成 381 µm 只有 2 个，而且都不可由细胞类型区分。</em></p>
+</div>
+
+<h3>这一轮修掉的工程问题</h3>
+<p class="note">值得记下来，因为都是"不报错但结果错"的那一类：<br>
+① <span class="mono">np.unique(..., return_inverse=True)</span> 返回的
+<span class="mono">inv</span> 是索引而不是 tile id，拿它比 id 导致每个瓦片都被判为
+"细胞数不足"；<br>
+② <span class="mono">nucleus_area</span> 不在装配表里，回退成 0 且不报警，使覆盖率
+恒为 0；<br>
+③ 用 16 位 morphology 图算"组织覆盖率"根本不成立（62% 像素为 0，Otsu 只剩 6%），
+改成实测细胞核面积覆盖；<br>
+④ <span class="mono">train_cnn.py</span> 在 CUDA 不可用时静默退回 CPU，10,052 个
+瓦片因此在 CPU 上跑了 57 分钟；<br>
+⑤ <span class="mono">augment()</span> 每个样本调一次 <span class="mono">F.interpolate</span>，
+一个 batch 两次共 64 次小 kernel 启动，实测 6 s/step；改成一次批处理
+<span class="mono">grid_sample</span> 后 54 s/epoch → 0.3 s/epoch。</p>
+
+<h2>11. 真实的连续切片：同一肿瘤的 3D 体积</h2>
 <p>第 6 节的 3D 是从<em>单张</em>二维切片合成出来的组织块，z 方向没有任何测量。
 这里换成一个真的：Pentimalli 等 2025 年（<em>Cell Systems</em>）把一块非小细胞
 肺癌蜡块切成 34 张连续 5 µm 切片，其中第 4、10、16、22、28、34 张用 CosMx 成像，
@@ -829,7 +1004,7 @@ Pearson 完全被泊松噪声主导 —— 这个参数错得足以让结论变�
 （CosMx 而非 Xenium），不能叠加在一起。
 </div>
 
-<h2>10. 与 Annotile 的逐步比较</h2>
+<h2>12. 与 Annotile 的逐步比较</h2>
 <p><a href="https://kainblue100.github.io/annotile/">Annotile</a> 解决的是同一个
 问题，而且逐步来看，它大部分做得更好。这张表是照着它的源码读的，不是照它的文字
 描述。</p>
@@ -925,7 +1100,7 @@ Annotile 的那样在切片之间比较，而跨切片可比正是它主张的�
 练习，那么该用的实现是 Annotile。
 </div>
 
-<h2>11. 本项目不能说明什么</h2>
+<h2>13. 本项目不能说明什么</h2>
 <div class="callout warn">
 <ul style="margin:0;padding-left:20px">
 <li><strong>三个样本。</strong>来自 5k、lc 和 luad 的 3,040 个瓦片。HIPPO 用了
@@ -943,7 +1118,7 @@ P3 的界面性质就是这样得到的 —— 但远不足以支持任何关于
 </ul>
 </div>
 
-<h2>12. 复现</h2>
+<h2>14. 复现</h2>
 <pre>python tools/fetch_10x_all.py            # 矩阵 + 坐标 + H&amp;E
 python tools/register_final.py          # 旋转、尺度、平移
 python tools/extract_tiles.py --tag 5k  # HIPPO 式切块 + 三种模态

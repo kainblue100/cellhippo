@@ -49,35 +49,46 @@ def augment(x, rng, jitter=0.25):
     Tiles arrive as NHWC uint8 from the npz and are converted to NCHW float here;
     the earlier version applied NCHW-shaped jitter to NHWC tensors, which is the
     shape error this fixes.
+
+    The crop is a single batched `affine_grid` + `grid_sample`, not a Python loop
+    of `F.interpolate` calls.  The loop version launched one kernel per sample,
+    twice per step, and measured 6 s per step on a batch of 32 on an RTX 4090 --
+    slower per tile than the CPU path it replaced.  One kernel per batch keeps
+    the GPU busy.
     """
     import torch
     import torch.nn.functional as F
 
-    x = x.permute(0, 3, 1, 2).contiguous()
+    x = x.permute(0, 3, 1, 2).float()
     n, c, h, w = x.shape
-    # random resized crop
-    scale = rng.uniform(0.6, 1.0, size=n)
-    crops = []
-    for i, s in enumerate(scale):
-        ch, cw = int(h * s), int(w * s)
-        y0 = rng.integers(0, h - ch + 1)
-        x0 = rng.integers(0, w - cw + 1)
-        crops.append(F.interpolate(
-            x[i:i + 1, :, y0:y0 + ch, x0:x0 + cw], size=(h, w),
-            mode="bilinear", align_corners=False))
-    out = torch.cat(crops, dim=0)
-    # horizontal flip
+    dev = x.device
+
+    crop = rng.uniform(0.60, 1.0, size=n).astype(np.float32)
     flip = rng.random(n) < 0.5
-    if flip.any():
-        out[flip] = torch.flip(out[flip], dims=[3])
-    # colour jitter
-    out = out * (1.0 + torch.as_tensor(
-        rng.uniform(-jitter, jitter, size=(n, c, 1, 1)), dtype=out.dtype,
-        device=out.device))
-    out = out + torch.as_tensor(
-        rng.uniform(-20, 20, size=(n, 1, 1, 1)), dtype=out.dtype,
-        device=out.device)
-    return out.clamp(0, 255)
+    # a crop of side `crop` must stay inside the tile, so its centre can only
+    # move within +-(1 - crop) in normalised coordinates
+    room = 1.0 - crop
+    ox = rng.uniform(-1.0, 1.0, size=n).astype(np.float32) * room
+    oy = rng.uniform(-1.0, 1.0, size=n).astype(np.float32) * room
+
+    theta = np.zeros((n, 2, 3), dtype=np.float32)
+    theta[:, 0, 0] = np.where(flip, -crop, crop)   # negative scale = mirror
+    theta[:, 1, 1] = crop
+    theta[:, 0, 2] = ox
+    theta[:, 1, 2] = oy
+
+    grid = F.affine_grid(torch.from_numpy(theta).to(dev), x.shape,
+                         align_corners=False)
+    out = F.grid_sample(x, grid, mode="bilinear", padding_mode="border",
+                        align_corners=False)
+
+    # colour jitter, one broadcast each
+    gain = torch.as_tensor(
+        rng.uniform(1.0 - jitter, 1.0 + jitter, size=(n, c, 1, 1)),
+        dtype=out.dtype, device=dev)
+    bias = torch.as_tensor(
+        rng.uniform(-20, 20, size=(n, 1, 1, 1)), dtype=out.dtype, device=dev)
+    return (out * gain + bias).clamp(0, 255)
 
 
 def nt_xent(z1, z2, temperature=0.2):
@@ -122,7 +133,9 @@ def main():
     ap.add_argument("--clusters", type=int, default=64)
     ap.add_argument("--width", type=int, default=32)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--device", default="auto",
+                    help="'auto' picks the GPU with the most free memory; "
+                         "'cpu' is an explicit opt-in to the slow path")
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
 
@@ -131,7 +144,49 @@ def main():
 
     torch.manual_seed(a.seed)
     rng = np.random.default_rng(a.seed)
-    dev = torch.device(a.device if torch.cuda.is_available() else "cpu")
+
+    # Device selection must be loud.  An earlier run of this script on 10,052
+    # tiles fell back to the CPU because torch.cuda.is_available() came back
+    # False, and the `if ... else "cpu"` turned that into a silent 4x slowdown
+    # that was only noticed 45 minutes in.  Refuse to run on the CPU unless the
+    # caller asked for it explicitly.
+    req = a.device
+    if req in ("auto", "") and not torch.cuda.is_available():
+        raise SystemExit(
+            "refusing to train on the CPU: 'auto' found no usable CUDA device "
+            f"(torch {torch.__version__}, cuda build {torch.version.cuda}). "
+            "Pass --device cpu to override.")
+    if req.startswith("cuda") and not torch.cuda.is_available():
+        raise SystemExit(
+            "refusing to train on the CPU: cuda is not available "
+            f"(torch {torch.__version__}, cuda build {torch.version.cuda}). "
+            "Pass --device cpu to override.")
+    if req == "auto":
+        # pick the GPU with the most free memory: this box is shared and two
+        # other jobs were holding ~6.5 GB of GPU 0 when this was first run
+        best, best_free = 0, -1
+        for i in range(torch.cuda.device_count()):
+            free, total = torch.cuda.mem_get_info(i)
+            print(f"  gpu{i}: {free/1e9:.1f} GB free of {total/1e9:.1f} GB",
+                  flush=True)
+            if free > best_free:
+                best, best_free = i, free
+        req = f"cuda:{best}"
+    dev = torch.device(req)
+    print(f"  torch {torch.__version__}  cuda {torch.version.cuda}  "
+          f"available {torch.cuda.is_available()}", flush=True)
+    if dev.type == "cuda":
+        p = torch.cuda.get_device_properties(dev)
+        print(f"  device {dev} = {p.name}, {p.total_memory/1e9:.1f} GB",
+              flush=True)
+        # a real allocation, not just a capability query: if this succeeds the
+        # training loop will be on the GPU
+        _probe = torch.zeros(1024, device=dev)
+        _probe += 1.0
+        print(f"  cuda allocation probe ok ({float(_probe.sum()):.0f})",
+              flush=True)
+    else:
+        print("  WARNING training on the CPU; this is much slower", flush=True)
 
     imgs = []
     for p in a.tiles:
@@ -222,7 +277,9 @@ def main():
     print(f"wrote {a.out}")
 
     json.dump({"n_tiles": int(n), "params": int(n_par), "epochs": a.epochs,
-               "clusters": a.clusters, "source": a.tiles},
+               "clusters": a.clusters, "source": a.tiles,
+               "device": str(dev), "cuda": bool(dev.type == "cuda"),
+               "torch": torch.__version__, "cuda_build": torch.version.cuda},
               open(a.out.replace(".npz", "_meta.json"), "w"), indent=2)
 
 

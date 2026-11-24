@@ -1,0 +1,270 @@
+{
+  "cohort": "takano_kero 17 samples",
+  "n_samples": 17,
+  "n_tiles": 10052,
+  "patterns": 3,
+  "samples": [
+    "Xenium_LUAD_No14",
+    "Xenium_LUAD_No16",
+    "Xenium_LUAD_No17",
+    "Xenium_LUAD_No2",
+    "Xenium_LUAD_No3",
+    "Xenium_TSU-20",
+    "Xenium_TSU-21",
+    "Xenium_TSU-23",
+    "Xenium_TSU-24",
+    "Xenium_TSU-25",
+    "Xenium_TSU-27",
+    "Xenium_TSU-28",
+    "Xenium_TSU-30",
+    "Xenium_TSU-33",
+    "Xenium_TSU-35",
+    "Xenium_TSU-36",
+    "Xenium_TSU-41"
+  ],
+  "composition": [
+    [
+      0.2531,
+      0.4088,
+      0.2895,
+      0.3278,
+      0.1419,
+      0.4841,
+      0.4638,
+      0.2549,
+      0.3442,
+      0.3491,
+      0.4529,
+      0.3246,
+      0.2315,
+      0.0453,
+      0.3106,
+      0.1282,
+      0.3198
+    ],
+    [
+      0.57,
+      0.2936,
+      0.614,
+      0.2942,
+      0.7333,
+      0.2357,
+      0.4032,
+      0.6405,
+      0.4006,
+      0.5388,
+      0.3338,
+      0.5858,
+      0.6874,
+      0.7449,
+      0.5833,
+      0.7949,
+      0.4709
+    ],
+    [
+      0.1768,
+      0.2977,
+      0.0965,
+      0.378,
+      0.1248,
+      0.2803,
+      0.1329,
+      0.1046,
+      0.2552,
+      0.1121,
+      0.2132,
+      0.0896,
+      0.0811,
+      0.2099,
+      0.1061,
+      0.0769,
+      0.2093
+    ]
+  ],
+  "signature": {
+    "0": {
+      "unassigned": 0.5823,
+      "AT2": 0.19,
+      "epi": 0.0654,
+      "fib": 0.0435,
+      "mph": 0.0406,
+      "AT1": 0.0337
+    },
+    "1": {
+      "unassigned": 0.5511,
+      "AT2": 0.1768,
+      "fib": 0.0691,
+      "mph": 0.059,
+      "epi": 0.0507,
+      "AT1": 0.0417
+    },
+    "2": {
+      "unassigned": 0.5351,
+      "epi": 0.1709,
+      "AT2": 0.119,
+      "fib": 0.053,
+      "mph": 0.0386,
+      "AT1": 0.0287
+    }
+  },
+  "separation": {
+    "min": 0.0021,
+    "max": 0.0275
+  },
+  "handovers": {
+    "Xenium_LUAD_No14": {
+      "0-1": 429,
+      "1-2": 378,
+      "0-2": 290
+    },
+    "Xenium_LUAD_No16": {
+      "0-2": 316,
+      "0-1": 248,
+      "1-2": 216
+    },
+    "Xenium_LUAD_No17": {
+      "0-1": 145,
+      "1-2": 81,
+      "0-2": 70
+    },
+    "Xenium_LUAD_No2": {
+      "1-2": 357,
+      "0-1": 328,
+      "0-2": 211
+    },
+    "Xenium_LUAD_No3": {
+      "1-2": 158,
+      "0-1": 152,
+      "0-2": 37
+    },
+    "Xenium_TSU-20": {
+      "0-2": 81,
+      "0-1": 45,
+      "1-2": 28
+    },
+    "Xenium_TSU-21": {
+      "0-1": 730,
+      "0-2": 267,
+      "1-2": 202
+    },
+    "Xenium_TSU-23": {
+      "0-1": 53,
+      "0-2": 14,
+      "1-2": 13
+    },
+    "Xenium_TSU-24": {
+      "0-1": 131,
+      "0-2": 96,
+      "1-2": 74
+    },
+    "Xenium_TSU-25": {
+      "0-1": 92,
+      "0-2": 53,
+      "1-2": 25
+    },
+    "Xenium_TSU-27": {
+      "0-1": 309,
+      "0-2": 235,
+      "1-2": 145
+    },
+    "Xenium_TSU-28": {
+      "0-1": 238,
+      "1-2": 89,
+      "0-2": 71
+    },
+    "Xenium_TSU-30": {
+      "0-1": 159,
+      "1-2": 75,
+      "0-2": 28
+    },
+    "Xenium_TSU-33": {
+      "1-2": 164,
+      "0-2": 37,
+      "0-1": 26
+    },
+    "Xenium_TSU-35": {
+      "0-1": 84,
+      "0-2": 39,
+      "1-2": 33
+    },
+    "Xenium_TSU-36": {
+      "0-1": 51,
+      "1-2": 28,
+      "0-2": 6
+    },
+    "Xenium_TSU-41": {
+      "0-1": 143,
+      "0-2": 92,
+      "1-2": 80
+    }
+  },
+  "handover_recurrence": {
+    "0-1": {
+      "samples": 17,
+      "per_sample": {
+        "Xenium_LUAD_No14": 429,
+        "Xenium_LUAD_No16": 248,
+        "Xenium_LUAD_No17": 145,
+        "Xenium_LUAD_No2": 328,
+        "Xenium_LUAD_No3": 152,
+        "Xenium_TSU-20": 45,
+        "Xenium_TSU-21": 730,
+        "Xenium_TSU-23": 53,
+        "Xenium_TSU-24": 131,
+        "Xenium_TSU-25": 92,
+        "Xenium_TSU-27": 309,
+        "Xenium_TSU-28": 238,
+        "Xenium_TSU-30": 159,
+        "Xenium_TSU-33": 26,
+        "Xenium_TSU-35": 84,
+        "Xenium_TSU-36": 51,
+        "Xenium_TSU-41": 143
+      }
+    },
+    "1-2": {
+      "samples": 17,
+      "per_sample": {
+        "Xenium_LUAD_No14": 378,
+        "Xenium_LUAD_No16": 216,
+        "Xenium_LUAD_No17": 81,
+        "Xenium_LUAD_No2": 357,
+        "Xenium_LUAD_No3": 158,
+        "Xenium_TSU-20": 28,
+        "Xenium_TSU-21": 202,
+        "Xenium_TSU-23": 13,
+        "Xenium_TSU-24": 74,
+        "Xenium_TSU-25": 25,
+        "Xenium_TSU-27": 145,
+        "Xenium_TSU-28": 89,
+        "Xenium_TSU-30": 75,
+        "Xenium_TSU-33": 164,
+        "Xenium_TSU-35": 33,
+        "Xenium_TSU-36": 28,
+        "Xenium_TSU-41": 80
+      }
+    },
+    "0-2": {
+      "samples": 17,
+      "per_sample": {
+        "Xenium_LUAD_No14": 290,
+        "Xenium_LUAD_No16": 316,
+        "Xenium_LUAD_No17": 70,
+        "Xenium_LUAD_No2": 211,
+        "Xenium_LUAD_No3": 37,
+        "Xenium_TSU-20": 81,
+        "Xenium_TSU-21": 267,
+        "Xenium_TSU-23": 14,
+        "Xenium_TSU-24": 96,
+        "Xenium_TSU-25": 53,
+        "Xenium_TSU-27": 235,
+        "Xenium_TSU-28": 71,
+        "Xenium_TSU-30": 28,
+        "Xenium_TSU-33": 37,
+        "Xenium_TSU-35": 39,
+        "Xenium_TSU-36": 6,
+        "Xenium_TSU-41": 92
+      }
+    }
+  },
+  "annotation_source": "derived by marker scoring on the 302-gene hLung_100g panel; not a pathologist label"
+}
