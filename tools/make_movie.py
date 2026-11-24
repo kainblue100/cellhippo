@@ -224,8 +224,8 @@ def main():
     ap.add_argument("--outdir", default=os.path.join(VOL, "movie"))
     ap.add_argument("--size", type=int, default=1100)
     ap.add_argument("--fps", type=int, default=12)
-    ap.add_argument("--lung", default=os.path.join(VOL, "lung_silhouette.png"),
-                    help="reference-anatomy plate; omit for no backdrop")
+    ap.add_argument("--lung", default="none",
+                    help="reference-anatomy plate; 'none' draws no backdrop")
     a = ap.parse_args()
 
     traj = json.load(open(a.traj))
@@ -245,7 +245,7 @@ def main():
                             "patch": int(m["patch_um"])}
 
     lung = None
-    if a.lung and os.path.exists(a.lung):
+    if a.lung and a.lung.lower() != "none" and os.path.exists(a.lung):
         raw = Image.open(a.lung).convert("RGBA")
         # crop to the alpha bounding box first: the render carries a wide empty
         # margin, so resizing the full frame left the lung small and pale inside
@@ -253,6 +253,8 @@ def main():
         bbox = raw.getchannel("A").getbbox()
         lung = raw.crop(bbox) if bbox else raw
         print(f"lung backdrop: {raw.size} -> cropped {lung.size}")
+    else:
+        print("lung backdrop: none")
 
     for tag in traj["slides"]:
         print(f"=== {tag} ===")

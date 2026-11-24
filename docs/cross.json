@@ -1,0 +1,234 @@
+{
+  "method": "pattern composition per sample, from the joint clustering",
+  "note": "samples are three different donors, not patients of one cohort",
+  "patterns": 4,
+  "samples": [
+    "5k",
+    "lc",
+    "luad"
+  ],
+  "composition": [
+    [
+      0.0083,
+      0.3431,
+      0.2883
+    ],
+    [
+      0.3781,
+      0.0601,
+      0.1887
+    ],
+    [
+      0.1177,
+      0.2331,
+      0.1813
+    ],
+    [
+      0.4958,
+      0.3636,
+      0.3417
+    ]
+  ],
+  "sample_correlation": [
+    [
+      1.0,
+      -0.1771,
+      0.2744
+    ],
+    [
+      -0.1771,
+      1.0,
+      0.8216
+    ],
+    [
+      0.2744,
+      0.8216,
+      1.0
+    ]
+  ],
+  "signature": {
+    "0": {
+      "epi": 0.2969,
+      "endo": 0.1494,
+      "mph": 0.1296,
+      "epi?": 0.1134,
+      "nkt": 0.1064,
+      "fib": 0.1011,
+      "plasma": 0.0218,
+      "endo?": 0.0193
+    },
+    "1": {
+      "epi": 0.2808,
+      "nkt": 0.1385,
+      "fib": 0.1053,
+      "mph": 0.095,
+      "endo": 0.0641,
+      "fib_SYNPO2": 0.0573,
+      "plasma": 0.0477,
+      "cil": 0.0409
+    },
+    "2": {
+      "epi": 0.2942,
+      "nkt": 0.1366,
+      "mph": 0.1169,
+      "fib": 0.0908,
+      "endo": 0.0792,
+      "epi?": 0.0654,
+      "plasma": 0.0455,
+      "fib?": 0.0339
+    },
+    "3": {
+      "epi": 0.2676,
+      "mph": 0.1334,
+      "nkt": 0.133,
+      "endo": 0.1088,
+      "fib": 0.099,
+      "epi?": 0.0541,
+      "plasma": 0.038,
+      "low_feat_cell": 0.0243
+    }
+  },
+  "signature_top": {
+    "0": [
+      "epi",
+      "endo",
+      "mph",
+      "epi?",
+      "nkt"
+    ],
+    "1": [
+      "epi",
+      "nkt",
+      "fib",
+      "mph",
+      "endo"
+    ],
+    "2": [
+      "epi",
+      "nkt",
+      "mph",
+      "fib",
+      "endo"
+    ],
+    "3": [
+      "epi",
+      "mph",
+      "nkt",
+      "endo",
+      "fib"
+    ]
+  },
+  "pattern_distance": {
+    "0": {
+      "closest": 3,
+      "distance": 0.0242
+    },
+    "1": {
+      "closest": 2,
+      "distance": 0.0324
+    },
+    "2": {
+      "closest": 3,
+      "distance": 0.0112
+    },
+    "3": {
+      "closest": 2,
+      "distance": 0.0112
+    }
+  },
+  "pattern_distance_summary": {
+    "min": 0.0112,
+    "max": 0.0837
+  },
+  "where": {
+    "0": {
+      "max_sample": "lc",
+      "max_frac": 0.34310850439882695,
+      "min_frac": 0.008310249307479225,
+      "spread": 0.33479825509134775
+    },
+    "1": {
+      "max_sample": "5k",
+      "max_frac": 0.3781163434903047,
+      "min_frac": 0.060117302052785926,
+      "spread": 0.3179990414375188
+    },
+    "2": {
+      "max_sample": "lc",
+      "max_frac": 0.23313782991202345,
+      "min_frac": 0.11772853185595568,
+      "spread": 0.11540929805606777
+    },
+    "3": {
+      "max_sample": "5k",
+      "max_frac": 0.49584487534626037,
+      "min_frac": 0.3417190775681342,
+      "spread": 0.15412579777812618
+    }
+  },
+  "stability": {
+    "ab_img": {
+      "n_patterns": 3,
+      "sample_pair_r": -0.9770857053691775,
+      "sample_correlation": [
+        [
+          1.0,
+          0.9052,
+          0.7864
+        ],
+        [
+          0.9052,
+          1.0,
+          0.4494
+        ],
+        [
+          0.7864,
+          0.4494,
+          1.0
+        ]
+      ]
+    },
+    "ab_exprann": {
+      "n_patterns": 3,
+      "sample_pair_r": -0.4397689236828854,
+      "sample_correlation": [
+        [
+          1.0,
+          0.2163,
+          -0.9868
+        ],
+        [
+          0.2163,
+          1.0,
+          -0.3717
+        ],
+        [
+          -0.9868,
+          -0.3717,
+          1.0
+        ]
+      ]
+    },
+    "ab_expr": {
+      "n_patterns": 3,
+      "sample_pair_r": 0.8453643725102564,
+      "sample_correlation": [
+        [
+          1.0,
+          -0.9997,
+          -0.0209
+        ],
+        [
+          -0.9997,
+          1.0,
+          -0.0034
+        ],
+        [
+          -0.0209,
+          -0.0034,
+          1.0
+        ]
+      ]
+    }
+  }
+}

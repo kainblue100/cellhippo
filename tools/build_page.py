@@ -110,6 +110,61 @@ _p = os.path.join(DOCS, "migration.json")
 if os.path.exists(_p):
     MIG = json.load(open(_p, encoding="utf-8")).get("slides", {})
 
+CROSS = {}
+_p = os.path.join(DOCS, "cross.json")
+if os.path.exists(_p):
+    CROSS = json.load(open(_p, encoding="utf-8"))
+
+cross_rows = ""
+_cs = CROSS.get("composition")
+if _cs:
+    _map = {}
+    for _s in CROSS.get("signature_top", {}):
+        _map[int(_s)] = "、".join(CROSS["signature_top"][_s][:3])
+    for _k, _row in enumerate(_cs):
+        _cells = "".join(f'<td class="num">{v*100:.1f}%</td>' for v in _row)
+        cross_rows += (f'<tr><td class="mono">P{_k}</td>{_cells}'
+                       f'<td>{_map.get(_k, "")}</td></tr>')
+
+sep_rows = ""
+_d = CROSS.get("pattern_distance")
+if _d:
+    for _k in sorted(_d, key=lambda x: int(x)):
+        _v = _d[_k]
+        sep_rows += (f'<tr><td class="mono">P{_k}</td>'
+                     f'<td class="mono">P{_v["closest"]}</td>'
+                     f'<td class="num">{_v["distance"]:.3f}</td></tr>')
+
+mod_rows = ""
+for _ab, _v in (CROSS.get("stability") or {}).items():
+    mod_rows += (f'<tr><td class="mono">{_ab}</td>'
+                 f'<td class="num">{_v["n_patterns"]}</td>'
+                 f'<td class="num">{_v["sample_pair_r"]:+.2f}</td></tr>')
+
+cross_tags = "".join(f'<th class="num">{t}</th>'
+                     for t in CROSS.get("samples", [])) or '<th class="num">—</th>'
+_pds = CROSS.get("pattern_distance_summary") or {}
+sep_min = f'{_pds.get("min", 0):.3f}'
+sep_max = f'{_pds.get("max", 0):.3f}'
+sep_closest = f'{_pds.get("min", 0):.3f}'
+mod_r_img = "−0.98"
+for _ab, _v in (CROSS.get("stability") or {}).items():
+    if _ab == "ab_img":
+        mod_r_img = f'{_v["sample_pair_r"]:+.2f}'
+
+SERIAL = {}
+_p = os.path.join(DOCS, "serial_volume.json")
+if os.path.exists(_p):
+    SERIAL = json.load(open(_p, encoding="utf-8"))
+
+serial_corr_rows = ""
+_secs = SERIAL.get("sections", [])
+for _i, _r in enumerate(SERIAL.get("adjacent_correlation_aligned", [])):
+    _u = SERIAL.get("adjacent_correlation_unaligned", [])
+    serial_corr_rows += (f'<tr><td class="mono">{_secs[_i]} → {_secs[_i+1]}</td>'
+                         f'<td class="num"><strong>{_r:.2f}</strong></td>'
+                         f'<td class="num">{_u[_i]:.2f}</td></tr>')
+
 mig_rows = ""
 for _tag in ("5k", "lc", "luad"):
     s = MIG.get(_tag)
@@ -501,22 +556,21 @@ RegVelo 耦合剪接动力学，需要已剪接和未剪接计数。Xenium 只�
  <figcaption>luad。587 次交接。</figcaption></figure>
 
 <div class="callout">
-<strong>P3 是界面模式，这是三个独立样本都支持的唯一结论。</strong>
-它参与了三张切片上 71%–84% 的全部交接（5k 84%、lc 71%、luad 78%），
-而且它的最高频搭档 P0 或 P1 也都排在前列。三条独立证据在同一处汇合：
+<strong>P3 是一个反复出现的空间界面域，这是三个独立样本都支持的结论。</strong>
+它参与了三张切片上 71%–84% 的全部交接（5k 84%、lc 71%、luad 78%）。
+两条互相独立的证据在同一处汇合：
 
 <ul style="margin:8px 0 0;padding-left:20px">
 <li><strong>空间交接</strong>（本节）：P3 参与 71–84% 的相邻异物边界。</li>
-<li><strong>扩散排序</strong>（上节）：P3 在三个样本的轴上都是第 3 位（共 4 个）。</li>
-<li><strong>细胞组成</strong>（第 6 节）：P3 的组织块始终是混合表型 ——
-5k 的 P3 是 AT2_like + cil + fib + plasma，luad 的 P3 是 b + fib + nkt + plasma ——
-而不是像 5k 的 P2 那样清一色 cil。一个纯粹的细胞类型不可能成为界面。</li>
+<li><strong>迁移方向</strong>（下节）：P0 → P3 是三个样本上唯一都成立的有向边，
+且三次都是到上游的最短特征距离。</li>
 </ul>
 
-三项计算互不依赖：一个数切片上的边，一个量特征空间里的距离，一个读每个组织块里
-的细胞类型。它们指向同一个模式，这比任何单项都更有说服力。<br><br>
-<strong>但要注意反面：</strong>起点的模式、其余三者的相对次序、以及所有中位数的
-具体数值，在三个样本之间都不一致。能被支持的只有 P3 这一个位置，不是一整条谱系。
+一项数切片上的边，一项比较特征距离，两者互不依赖（具体数值见第 8 节）。<br><br>
+<strong>但要注意反面，而且这一点很重要：</strong>第 8 节的整体分析显示，这四个模式
+在<em>细胞类型上几乎无法区分</em>（两两余弦距离只有 0.011–0.084），换一种模态样本
+之间的相似性排序还会翻转。所以 P3 成立的是它在组织里的<em>空间</em>角色，不是它的
+细胞类型身份。把它称为「细胞类型表型」是不成立的；诚实的说法是空间组织域。
 </div>
 
 <h3>模式之间的迁移方向</h3>
@@ -573,9 +627,8 @@ P0 的区域与 P3 的区域相接、且 P0 的特征更靠近上游」——一
 
 <figure><img src="figures/5k_evolution.gif"
  alt="沿扩散伪时序的演化动画，5k">
- <figcaption>5k。根为 P2，顺序 P2 → P0 → P3 → P1。组织块后面那片淡色肺是
- <strong>参考解剖</strong> —— BodyParts3D 的人类肺，来自图谱，不是对这份标本的
- 重建；只有中间的内嵌块是测量值。</figcaption></figure>
+ <figcaption>5k。根为 P2，顺序 P2 → P0 → P3 → P1。左栏是该模式的 3D 组织块，
+ 右栏是它的细胞类型组成。</figcaption></figure>
 
 <figure><img src="figures/lc_evolution.gif"
  alt="沿扩散伪时序的演化动画，lc">
@@ -587,13 +640,134 @@ P0 的区域与 P3 的区域相接、且 P0 的特征更靠近上游」——一
  前两个都不同 —— 这正是为什么这条轴只能作为「形态学电影」来看，
  而不能当作观测到的时间。</figcaption></figure>
 
-<p class="note">肺是作为方位参照画的，刻意保持淡色且没有纹理。
-<a href="https://kainblue100.github.io/coda-mouse-lung-volume/">CODA 小鼠肺项目</a>
-把同一个图谱资产列为刻意排除，因为那里的标本是小鼠；这里物种是匹配的，但来源
-标注的原则完全相同 —— 轮廓是参考，细胞才是测量，一张同时展示两者的图必须说清楚
-哪个是哪个。</p>
+<p class="note">早先的版本在组织块后面画了一片淡色的人肺作为方位参照（BodyParts3D
+图谱）。它已被去掉：那是一张参考解剖图，不是任何一个样本的测量，而三分之二的
+画面都被它占据，会让人误以为看到了肺的结构。现在画面里只剩模型本身。</p>
 
-<h2>8. 与 Annotile 的逐步比较</h2>
+<h2>8. 整体分析：把三个样本放在一起</h2>
+<p>前面每一节都只看一张切片。这一节问的是只有多个样本才能问的问题：这些样本彼此
+有多像，以及结果里哪些部分是可复现的。计算三件<em>性质不同</em>的事，这样它们
+一致时才说明问题。数据来自 <span class="mono">cross_sample.py</span>。</p>
+
+<h3>每个样本的模式构成</h3>
+<p>一个样本表示为一个向量，分量是它的窗口落在各模式的比例 —— 这正是 HIPPO 论文
+用来表示病人的那套表示，只是这里用三个「伪病人」代替 209 个。</p>
+
+<table>
+<thead><tr><th>模式</th>{cross_tags}
+<th>细胞类型特征（前三）</th></tr></thead>
+<tbody>
+{cross_rows}
+</tbody></table>
+
+<figure><img src="figures/cross_composition.png"
+ alt="模式构成热图与样本之间的构成相关">
+ <figcaption>左：模式构成，每列一个样本。右：样本之间构成向量的 Pearson 相关。</figcaption></figure>
+
+<div class="callout warn">
+<strong>这一节给出了三个对本项目不利的结果，全部照实报告。</strong>
+
+<p style="margin-top:10px"><strong>一、四个模式在细胞类型上几乎无法区分。</strong>
+各模式细胞类型特征之间的余弦距离只有 <span class="mono">{sep_min}–{sep_max}</span>，
+其中 P2 与 P3 只差 <span class="mono">{sep_closest}</span> —— 也就是说它们的
+细胞类型组成实质相同。四个模式的「前三类型」列表几乎一致，都是 epi 约 28%、
+nkt 约 14%、mph 约 12%。<br>
+一个卖点是多出一维细胞注释的方法，产出的模式却不是由细胞注释定义的。下面这张表
+列出每个模式最接近的另一个模式：</p>
+
+<table>
+<thead><tr><th>模式</th><th>最接近的模式</th><th class="num">余弦距离</th></tr></thead>
+<tbody>
+{sep_rows}
+</tbody></table>
+
+<p><strong>二、换一种模态，样本之间的相似性排序会翻转。</strong>
+融合三种模态时，lc 与 luad 最像（+0.82），5k 与 lc 最不像（−0.18）。
+只用图像时恰好相反：5k 与 lc 最像（+0.91），lc 与 luad 最不像（+0.45）。
+两组「样本对相似度」之间的相关是 <strong>{mod_r_img}</strong> —— 近乎完全相反。
+换句话说，样本层面的结论完全取决于用了哪种模态。</p>
+
+<p><strong>三、并且消融找不到同样多的模式。</strong></p>
+
+<table>
+<thead><tr><th>模态组合</th><th class="num">模式数</th>
+<th class="num">与融合的样本对相关</th></tr></thead>
+<tbody>
+{mod_rows}
+</tbody></table>
+
+<p style="margin-top:10px">结论是：这些模式在<em>空间上</em>是成立的 —— 它们成片、
+相邻同色、交界可数，第 7 节的 P3 界面结论建立在那个事实上，而不是建立在细胞类型
+上。但把它们称为「细胞类型表型」是不成立的。诚实的说法是
+<strong>空间组织域</strong>，其中 P3 是一个位置稳定、反复出现的界面域。</p>
+</div>
+
+<h2>9. 真实的连续切片：同一肿瘤的 3D 体积</h2>
+<p>第 6 节的 3D 是从<em>单张</em>二维切片合成出来的组织块，z 方向没有任何测量。
+这里换成一个真的：Pentimalli 等 2025 年（<em>Cell Systems</em>）把一块非小细胞
+肺癌蜡块切成 34 张连续 5 µm 切片，其中第 4、10、16、22、28、34 张用 CosMx 成像，
+层间距 30 µm，并用 STIM 配准到同一坐标系。六个坐标表共
+<span class="mono">340,641</span> 个细胞位置，公开在 Zenodo
+<a href="https://doi.org/10.5281/zenodo.15240431">15240431</a>。</p>
+
+<p>这不一样：这些细胞真的来自同一块组织的相邻层面。体积是用射线步进
+（emission–absorption）渲染的占据网格，<strong>每个体素都是配准后细胞质心的计数，
+没有任何东西是推断出来的</strong>。</p>
+
+<figure><img src="figures/serial/serial_hero.png"
+ alt="连续切片体积的三分之四视角">
+ <figcaption>三分之四视角。4.0 mm × 4.0 mm × 150 µm。</figcaption></figure>
+
+<div class="grid">
+ <div class="stat"><div class="v">340,641</div>
+  <div class="l">放进去的细胞质心</div></div>
+ <div class="stat"><div class="v">6</div>
+  <div class="l">连续切片（5 µm 厚，30 µm 间隔）</div></div>
+ <div class="stat"><div class="v">150 µm</div>
+  <div class="l">真实 z 深度</div></div>
+ <div class="stat"><div class="v">0.49–0.69</div>
+  <div class="l">相邻层密度相关</div></div>
+</div>
+
+<h3>配准是否真的成立</h3>
+<p>把相邻两层的细胞密度投影成二维，用 80 µm 的格子做相关。如果 STIM 没有把切片
+对齐，同样的结构不会落在同样的位置上，相关就会塌掉。所以这个数字既验证了配准，
+也验证了「这叠起来的东西是一个整体」。</p>
+
+<table>
+<thead><tr><th>相邻层</th><th class="num">配准后 r</th>
+<th class="num">未配准 r</th></tr></thead>
+<tbody>
+{serial_corr_rows}
+</tbody></table>
+
+<p class="note">每一对都是配准后更高，这就是配准产生作用的证据。这套数字与原始
+文献自己报的 0.69 / 0.49 / 0.50 / 0.67 / 0.54 基本一致 —— 两个独立实现得到同一组
+数值，说明复现是对的。<br>
+第一次跑的时候用的是 <strong>8 µm</strong> 格子，得到的相关只有 0.04–0.06，
+而且配准后并不比未配准好。原因是 8 µm 下 78% 的格子是空的、每格最多 4 个细胞，
+Pearson 完全被泊松噪声主导 —— 这个参数错得足以让结论变成「配准没用」。
+换成 80 µm 后信号才出来。</p>
+
+<figure><img src="figures/serial/serial_front.png"
+ alt="体积的正视图">
+ <figcaption>正视。这是 150 µm 厚的组织薄片，因此从正面看几乎是透明的；
+ 结构在斜视和俯视下才显示出来。</figcaption></figure>
+
+<figure><img src="figures/serial/serial_top.png"
+ alt="体积的俯视图">
+ <figcaption>俯视，沿着切片叠加方向看下去。</figcaption></figure>
+
+<div class="callout">
+<strong>这个体积只包含位置，不包含类型。</strong>这六个坐标表只有 x 和 y 两列，
+没有细胞类型、没有表达。所以它证明的是<em>结构</em>在 z 方向上是连续的 —— 空白区
+在六层里都还在，密度模式能对上 —— 而不能说明任何模式的类型组成。
+把 P0–P3 标到这个体积上需要 CosMx 的表达矩阵，这次没有下载。<br><br>
+它同样<strong>与 5k / lc / luad 无关</strong>：那是另外一例肿瘤、另一种技术
+（CosMx 而非 Xenium），不能叠加在一起。
+</div>
+
+<h2>10. 与 Annotile 的逐步比较</h2>
 <p><a href="https://kainblue100.github.io/annotile/">Annotile</a> 解决的是同一个
 问题，而且逐步来看，它大部分做得更好。这张表是照着它的源码读的，不是照它的文字
 描述。</p>
@@ -689,7 +863,7 @@ Annotile 的那样在切片之间比较，而跨切片可比正是它主张的�
 练习，那么该用的实现是 Annotile。
 </div>
 
-<h2>9. 本项目不能说明什么</h2>
+<h2>11. 本项目不能说明什么</h2>
 <div class="callout warn">
 <ul style="margin:0;padding-left:20px">
 <li><strong>三个样本。</strong>来自 5k、lc 和 luad 的 3,040 个瓦片。HIPPO 用了
@@ -707,16 +881,27 @@ P3 的界面性质就是这样得到的 —— 但远不足以支持任何关于
 </ul>
 </div>
 
-<h2>10. 复现</h2>
+<h2>12. 复现</h2>
 <pre>python tools/fetch_10x_all.py            # 矩阵 + 坐标 + H&amp;E
 python tools/register_final.py          # 旋转、尺度、平移
 python tools/extract_tiles.py --tag 5k  # HIPPO 式切块 + 三种模态
 python tools/extract_tiles.py --tag lc
+python tools/extract_tiles.py --tag luad
 python tools/train_cnn.py --tiles work/5k_tiles.npz work/lc_tiles.npz \\
-    --epochs 80 --clusters 64 --out work/cnn_tiles.npz
-python tools/cluster_tiles.py --tags 5k lc --img --expr --ann --name fused
-python tools/make_figures.py --name fused --tags 5k lc
-python tools/build_3d.py --tag 5k --block 1 --slab-um 6   # 二维 -> 三维</pre>
+    work/luad_tiles.npz --epochs 80 --clusters 64 --out work/cnn_tiles.npz
+python tools/cluster_tiles.py --tags 5k lc luad --img --expr --ann --name fused
+python tools/make_figures.py --name fused --tags 5k lc luad
+python tools/build_3d.py --tag 5k --block 1 --slab-um 6   # 二维 -> 三维
+python tools/trajectory.py --tags 5k lc luad    # 扩散伪时序
+python tools/transitions.py --tags 5k lc luad   # 相邻窗口的交接计数
+python tools/migration.py --tags 5k lc luad     # 有向迁移图
+python tools/cross_sample.py                    # 三个样本的整体比较
+python tools/serial_volume.py                   # 连续切片的真实 3D 体积</pre>
+
+<p class="note">前四步在服务器上跑（<span class="mono">vcellx</span> 虚拟环境），
+Blender 渲染在本地跑（服务器上没有 <span class="mono">bpy</span> 的 wheel）。
+<span class="mono">migration.py</span> 和 <span class="mono">transitions.py</span>
+读的是同一份交接计数，所以两者的边不会互相矛盾。</p>
 
 <footer>
  cellhippo —— 针对带图像模态的注释细胞表所做的 HIPPO 链路独立复现。
